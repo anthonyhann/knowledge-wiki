@@ -1,0 +1,17 @@
+[
+  {
+    "id": "tp-01",
+    "prompt": "/knowledge-wiki init",
+    "expected": "Agent 能按 SKILL.md 的三阶段流程（创建结构→安装脚本→首次执行）完整初始化知识库，输出清晰的完成摘要，包含目录树、脚本清单、hook 状态、健康报告"
+  },
+  {
+    "id": "tp-02",
+    "prompt": "/knowledge-wiki ingest https://km.sankuai.com/collabpage/2760577321",
+    "expected": "Agent 识别为学城平台 URL，使用正确的提取策略（heading/cell/textbox 全量提取），处理登录态检测，生成草稿写入 inbox/，更新 graph.json 和 index.md"
+  },
+  {
+    "id": "tp-03",
+    "prompt": "/knowledge-wiki ask \"API 网关的限流策略有哪些？\"",
+    "expected": "Agent 执行四层混合检索（BM25+Dense+GraphRAG+父子分块），给出带来源标注的回答，包含置信度和推荐问题，输出格式符合 SKILL.md 规定的模板"
+  }
+]

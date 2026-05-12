@@ -60,8 +60,6 @@ Your team's knowledge is scattered across Xuecheng docs, Lark spreadsheets, Apip
 ### 2. Import Documents
 
 ```bash
-# From Xuecheng (requires Meituam intranet login)
-/knowledge-wiki ingest https://km.sankuai.com/collabpage/2760577321
 
 # From Lark (requires Lark login)
 /knowledge-wiki ingest https://bytedance.larkoffice.com/docx/PW6PdvVPFoNwgjxgRPWcwBrknmc
@@ -212,7 +210,6 @@ How to proceed?
 
 | Platform | Access | Features |
 |----------|--------|----------|
-| Xuecheng `km.sankuai.com` | Meituam intranet login | Full heading/table/code extraction |
 | Lark `larkoffice.com` | Lark login | TOC tree + structured body extraction |
 | Apipost `docs.apipost.net` | Public, no login | API params auto-converted to entity pages |
 | Web pages `https://...` | Public | Body text extraction, nav noise removed |
@@ -283,4 +280,4 @@ This skill uses progressive disclosure — `SKILL.md` is the navigation entry wi
 
 ## 📜 License
 
-Internal tool — Meituam Maiyatian Team
+Internal tool — Anthony

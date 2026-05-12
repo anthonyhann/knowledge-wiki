@@ -61,8 +61,6 @@
 ### 2. 导入已有文档
 
 ```bash
-# 从学城导入（需美团内网登录）
-/knowledge-wiki ingest https://km.sankuai.com/collabpage/2760577321
 
 # 从飞书导入（需飞书登录）
 /knowledge-wiki ingest https://bytedance.larkoffice.com/docx/PW6PdvVPFoNwgjxgRPWcwBrknmc
@@ -229,7 +227,6 @@ src-001  AI-DLC框架  ↑ 已更新（章节"三、各层说明"有变更）→
 
 | 平台 | 访问前提 | 特点 |
 |------|---------|------|
-| 学城 `km.sankuai.com` | 美团内网登录 | heading/table/code 完整提取 |
 | 飞书 `larkoffice.com` | 飞书已登录 | 目录树 + 正文分层提取 |
 | Apipost `docs.apipost.net` | 公开，无需登录 | 接口参数自动转 entity 页面 |
 | 普通网页 `https://...` | 公开页面 | 提取正文，去导航噪声 |
@@ -300,5 +297,5 @@ knowledge-wiki 融合以下领域最佳实践：
 
 ## 📜 许可证
 
-内部工具 — 美团麦芽田团队
+内部工具 — Anthony
 

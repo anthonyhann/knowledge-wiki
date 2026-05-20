@@ -1,0 +1,218 @@
+# 模板注册表 — 由 /knowledge-wiki in 在 AI 结构化 Step 2.5 自动加载
+#
+# 用法：
+#   1. 录入流程 Step 2 推断出 type 后，AI 读取本文件，定位到该 type 的模板文件
+#   2. 按模板骨架整理正文，required_sections 必填，optional_sections 可省
+#   3. 写入前（Step 8.5）按 quality_gate 校验，缺失必填段时返回用户补充
+#
+# 维护原则：
+#   - 模板字段变更必须同步更新 references/ingestion-rules.md 与 SKILL.md
+#   - 新增 type 必须先在本文件登记，再创建 {type}.md，否则 AI 无法路由
+#   - 任何模板的 required_sections 调整都要在 CHANGELOG.md 记录
+
+version: 1
+default_expires_days: 90        # 兜底过期时间（天）；模板可覆盖
+
+templates:
+
+  glossary:
+    file: glossary.md
+    target_dir: glossary/
+    layer: L1
+    expires_days: never         # 术语长期有效，不过期
+    required_sections:
+      - TL;DR
+      - 定义
+      - 同义词与别名
+    optional_sections:
+      - 使用场景
+      - 边界（不是什么）
+    quality_gate: "至少包含一个技术字段名（后端字段 / 数据库列 / 前端命名）映射"
+
+  architecture:
+    file: architecture.md
+    target_dir: design/
+    layer: L1
+    expires_days: 180           # 架构活文档，半年复审
+    required_sections:
+      - TL;DR
+      - 架构概览
+      - 服务拓扑
+      - 模块职责
+    optional_sections:
+      - 关键依赖
+      - 部署形态
+      - 演进路线
+    quality_gate: "服务拓扑必须列出上下游服务名；模块职责至少 2 个"
+
+  solution:
+    file: solution.md
+    target_dir: design/
+    layer: L2
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 背景与目标
+      - 方案设计
+      - 影响面
+    optional_sections:
+      - 备选方案对比
+      - 风险与回滚
+      - 上线计划
+    quality_gate: "影响面必须列出涉及服务/接口/数据表"
+
+  adr:
+    file: adr.md
+    target_dir: design/
+    layer: L1
+    expires_days: never         # 决策记录是历史快照，不过期
+    required_sections:
+      - TL;DR
+      - 背景
+      - 决策
+      - 备选方案
+      - 取舍理由
+    optional_sections:
+      - 后果
+      - 复审条件
+    quality_gate: "决策与取舍理由必须明确，备选方案至少 2 个"
+
+  requirement:
+    file: requirement.md
+    target_dir: requirements/
+    layer: L1
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 需求背景
+      - 用户故事
+      - 验收标准
+    optional_sections:
+      - 范围边界
+      - 非功能要求
+      - 排期与里程碑
+    quality_gate: "验收标准必须可测试（含明确通过条件）"
+
+  flow:
+    file: flow.md
+    target_dir: flows/
+    layer: L2
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 触发条件
+      - 主流程步骤
+      - 异常分支
+    optional_sections:
+      - 前置条件
+      - 人工介入节点
+      - 时序图
+    quality_gate: "主流程步骤必须编号；异常分支至少列出 1 条"
+
+  api:
+    file: api.md
+    target_dir: apis/
+    layer: L3
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 接口概述
+      - 请求参数
+      - 响应结构
+      - 错误码
+    optional_sections:
+      - 调用示例
+      - 限流与超时
+      - 字段映射
+    quality_gate: "请求参数与响应结构必须完整列出字段类型；错误码至少 1 个"
+
+  data:
+    file: data.md
+    target_dir: data/
+    layer: L3
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 数据模型
+      - 字段定义
+    optional_sections:
+      - 索引策略
+      - 容量与分片
+      - Redis Key 命名
+      - 关联模型
+    quality_gate: "字段定义必须包含类型、是否可空、业务含义"
+
+  ops:
+    file: ops.md
+    target_dir: ops/
+    layer: L3
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 运行参数
+      - 告警与阈值
+    optional_sections:
+      - 大促保障
+      - 故障预案
+      - 限流配置
+      - 部署位置
+    quality_gate: "运行参数必须有具体数值（超时/重试/并发）"
+
+  incident:
+    file: incident.md
+    target_dir: incidents/
+    layer: L2
+    expires_days: 365           # 故障复盘保留 1 年
+    required_sections:
+      - TL;DR
+      - 时间线
+      - 影响范围
+      - 根因分析
+      - 改进措施
+    optional_sections:
+      - 修复措施
+      - Use Case 价值
+      - 关联事故
+    quality_gate: "改进措施必须有负责人与截止日；根因不能停留在表面现象"
+
+  bizrule:
+    file: bizrule.md
+    target_dir: bizrules/
+    layer: L2
+    expires_days: 180
+    required_sections:
+      - TL;DR
+      - 规则描述
+      - 适用条件
+      - 计算/判断逻辑
+    optional_sections:
+      - 边界场景
+      - 历史变更
+      - 关联流程
+    quality_gate: "计算/判断逻辑必须可被代码实现（含具体公式或分支）"
+
+  meeting:
+    file: meeting.md
+    target_dir: meetings/
+    layer: 辅助
+    expires_days: 180
+    required_sections:
+      - TL;DR
+      - 会议信息
+      - 讨论要点
+      - 结论与 Action
+    optional_sections:
+      - 待跟进项
+      - 参会人
+      - 关联文档
+    quality_gate: "结论与 Action 必须有责任人，至少 1 项"
+
+# ----------------------------------------------------------------------
+# AI 选择模板的伪代码：
+#   1. type = infer_type(content)            # 见 ingestion-rules.md type 推断规则
+#   2. tpl  = registry.templates[type]       # 加载本文件中对应条目
+#   3. body = render(tpl.file, content)      # 按模板骨架整理正文
+#   4. validate(body, tpl.required_sections, tpl.quality_gate)  # 质量门禁
+#   5. write(.knowledge/{tpl.target_dir}/{slug}.md)
+# ----------------------------------------------------------------------
+

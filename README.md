@@ -1,283 +1,421 @@
-<h1 align="center">📚 knowledge-wiki</h1>
+<div align="center">
 
-<p align="center">
-  <strong>Turn scattered docs into a structured, searchable, Agent-reasonable knowledge base</strong>
-</p>
+# 📚 knowledge-wiki
 
-<p align="center">
-  <a href="./README_zh.md">中文文档</a> ·
-  <a href="./CHANGELOG.md">Changelog</a> ·
-  <a href="./SKILL.md">Skill Spec</a>
-</p>
+**Full-lifecycle team knowledge management — capture, query, and maintain with zero friction.**
 
-<p align="center">
-  <img src="https://img.shields.io/badge/trigger-%2Fknowledge--wiki-blue" alt="trigger" />
-  <img src="https://img.shields.io/badge/formats-11%2B-green" alt="formats" />
-  <img src="https://img.shields.io/badge/platforms-Xuecheng%20%7C%20Lark%20%7C%20Apipost-orange" alt="platforms" />
-  <img src="https://img.shields.io/badge/retrieval-BM25%20%2B%20Dense%20%2B%20GraphRAG-purple" alt="retrieval" />
-</p>
+[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](./CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+[![Claude Skill](https://img.shields.io/badge/claude-skill-orange.svg)](./SKILL.md)
+[![Requires](https://img.shields.io/badge/requires-ripgrep%20%7C%20git-lightgrey.svg)](#tool-dependencies)
+
+Turns scattered content from Feishu, Apipost, code, and meetings into a structured, searchable, strictly-sourced local knowledge base — integrated directly into your Claude Code workflow.
+
+[Quick Start](#quick-start) · [Commands](#commands) · [Templates](#template-library) · [Design](#design-principles) · [Changelog](./CHANGELOG.md)
+
+</div>
 
 ---
 
 ## Why knowledge-wiki?
 
-Your team's knowledge is scattered across Xuecheng docs, Lark spreadsheets, Apipost specs, code comments, and meeting notes. Every time someone asks *"How does this API work?"* or *"Why did we make that decision?"*, you either dig through half a dozen tools or ask a colleague who might not remember.
+Most teams suffer from the same three problems:
 
-**knowledge-wiki unifies all that into one structured knowledge base** that AI Agents can directly search, reason over, and answer from.
-
-| Problem | How we solve it |
-|---------|-----------------|
-| 🔍 **Can't find it** — docs live on 5+ platforms | Single knowledge base with hybrid search (BM25 + Dense + GraphRAG) |
-| 🕰️ **It's outdated** — Xuecheng updated, local copy didn't sync | Persistent sync sources with auto-change detection |
-| 🧠 **Knowledge rots** — code changes, nobody updates docs | Pre-push hook auto-detects stale docs and suggests updates |
+| Problem | What happens | How this fixes it |
+|---------|-------------|------------------|
+| **Scattered knowledge** | Docs live in Feishu, Notion, Slack, and heads | Single `.knowledge/` directory, one ingestion command |
+| **Knowledge rot** | Outdated docs silently mislead | 90-day expiry + git hook warnings before every push |
+| **High entry barrier** | Nobody writes docs because templates are intimidating | Type-inferred scaffolding — just paste, AI structures it |
 
 ---
 
-## ✨ Core Capabilities
+## Quick Start
 
-| Capability | What it does | Command |
-|------------|-------------|---------|
-| **RAG Q&A** | Instant answers from your knowledge base | `/knowledge-wiki ask` |
-| **Agent Reasoning** | Multi-step ReACT reasoning for complex questions | `/knowledge-wiki reason` |
-| **Wiki Generation** | Auto-generate structured, interlinked Wiki pages | `/knowledge-wiki wiki` |
-| **Sync Sources** | Track external docs; auto-detect changes on push | `/knowledge-wiki source` |
+```bash
+# 1. Go to your project root
+cd ~/your-project
+
+# 2. Initialize (checks tools, creates .knowledge/, installs git hooks)
+/knowledge-wiki init
+
+# 3. Record your first piece of knowledge
+/knowledge-wiki in "Print service timeout threshold is 30s, falls back to local cache"
+
+# 4. Query it
+/knowledge-wiki ask "print service timeout"
+
+# 5. Run a health check anytime
+/knowledge-wiki health
+```
+
+> [!TIP]
+> `/knowledge-wiki init` auto-detects missing tools and offers one-command install. See [Tool Dependencies](#tool-dependencies).
 
 ---
 
-## 🚀 Quick Start
+## Commands
 
-### 1. Initialize
+### Overview
+
+| Command | What it does |
+|---------|-------------|
+| [`init`](#init) | Check tools · create `.knowledge/` · install git hooks |
+| [`in`](#ingestion) | Ingest text, URLs, files, or code with zero friction |
+| [`ask`](#query) | Strict-source Q&A — never guesses without a record |
+| [`health`](#health) | Detect rot · scan external sources · coverage report |
+
+### `init`
 
 ```bash
 /knowledge-wiki init
-# ✓ Creates .knowledge/ directory structure (7 sub-dirs under docs/)
-# ✓ Generates governance files (CLAUDE.md / AGENTS.md / CONTRIBUTING.md)
-# ✓ Installs 5 scripts (kb-sync.sh, generate-dashboard.py, etc.)
-# ✓ Installs .git/hooks/pre-push (auto-check before push)
-# ✓ Runs initial generation and health check
 ```
 
-### 2. Import Documents
+Runs `check-deps.sh`, creates the directory structure, and installs two git hooks. Aborts if required tools (`rg`, `git`) are missing — choose auto-install, manual install, or abort.
+
+### Ingestion
 
 ```bash
+/knowledge-wiki in <text|URL|file-path>     # Smart ingest from any source
+/knowledge-wiki in --update <slug>           # Update an existing entry
 
-# From Lark (requires Lark login)
-/knowledge-wiki ingest https://bytedance.larkoffice.com/docx/PW6PdvVPFoNwgjxgRPWcwBrknmc
-
-# From Apipost — recursive, no login needed
-/knowledge-wiki ingest "https://docs.apipost.net/docs/detail/5347b5d25884000" --recursive
-
-# From local code
-/knowledge-wiki ingest ./src/ --type code
-
-# From a PDF
-/knowledge-wiki ingest ./docs/technical-spec.pdf
+/knowledge-wiki in source add <url> [--name <label>]   # Register external source
+/knowledge-wiki in source list
+/knowledge-wiki in source remove <id>
 ```
 
-### 3. Register Sync Sources
+### Query
 
 ```bash
-/knowledge-wiki source add https://km.sankuai.com/collabpage/2760577321 \
-  --name "AI-DLC Framework" --tags "ai,framework"
-
-/knowledge-wiki source list
-# ID       Name                    Status   Last Synced
-# src-001  AI-DLC Framework        active   2026-05-07
+/knowledge-wiki ask "<question>"             # Strict-source answer
+/knowledge-wiki ask links <slug>             # Who references this doc?
+/knowledge-wiki ask refs <slug>              # What does this doc reference?
 ```
 
-### 4. Use It
+### Health
 
 ```bash
-# Quick Q&A
-/knowledge-wiki ask "What are the rate-limiting strategies for the API gateway?"
-
-# Complex reasoning (auto-orchestrates KB + MCP tools + web search)
-/knowledge-wiki reason "Analyze the root cause of rate-limit false positives based on historical ADRs"
-
-# Visualize knowledge graph (open in browser)
-/knowledge-wiki graph
+/knowledge-wiki health                       # Full health report
+/knowledge-wiki health rot                   # Expired / expiring docs
+/knowledge-wiki health scan                  # External source change detection
+/knowledge-wiki health coverage              # Coverage gaps
+/knowledge-wiki health audit <slug>          # Confirm valid → promote to active
+/knowledge-wiki health deprecate <slug>      # Mark as deprecated
 ```
 
 ---
 
-## 📖 Usage Examples
+## Directory Structure
 
-### Onboarding a New Team Member
-
-```bash
-/knowledge-wiki ask "What's the difference between channel-side and delivery-side APIs?"
-
-# Output:
-# Channel APIs (/channel/) handle merchant-side messages, routed by Tag field...
-# Delivery APIs (/delivery/) handle delivery status push, routed by Command field...
-# Sources: [[api-gateway]] [[myt-adapter-architecture]] (relevance ⭐⭐⭐⭐)
-# Confidence: high
-#
-# 💡 Related questions:
-# 1. What is the complete flow for channel onboarding?
-# 2. How do send and receive services differ in log format?
-```
-
-### Pre-Push Auto-Reminder
-
-```bash
-$ git push origin feature/rate-limiter
-
-━━━ Knowledge Base Sync Analysis (.knowledge/) ━━━
-📦 Changed files:
-  internal/gateway/rate_limiter.go
-  internal/gateway/config.go
-
-📝 Suggested KB updates:
-  pages/entities/api-gateway.md  [exists, needs update]
-
-How to proceed?
-  [1] Sync sources  [2] Update docs  [3] Both  [4] Skip & push
-```
-
-### Complex Multi-Step Reasoning
-
-```bash
-/knowledge-wiki reason \
-  "The doudian channel frequently returns 5xx during peak hours. Analyze root cause based on current architecture and historical ADRs."
-
-# Agent automatically:
-# Thought: Need to understand current architecture and past decisions
-# Action: kb_search("doudian 5xx rate limiting")
-# Observation: Found pages/entities/doudian-adapter.md, docs/implementation/rate-limiter-v2-adr.md
-# Thought: Check specific interface implementation
-# Action: kb_read("doudian-adapter")
-# ...
-# Final Answer: Troubleshooting steps: 1. Confirm send vs receive side → 2. Check Tag routing config...
-```
-
----
-
-## 🗂 Directory Structure
+After `init`, your project gets:
 
 ```
 .knowledge/
-├── CLAUDE.md              # AI collaboration contract (Agent reads this first)
-├── AGENTS.md              # AI navigation map (≤100 lines)
-├── dashboard.md           # [CI-generated] Knowledge base dashboard
-├── graph.html             # [CI-generated] Knowledge graph visualization
-├── strategy/              # Team golden principles (low-frequency, owner-maintained)
-├── docs/                  # Project docs (organized by lifecycle)
-│   ├── requirements/      # PRDs, requirement docs, UI designs
-│   ├── design/            # Tech specs, flowcharts, PUML
-│   ├── implementation/    # ADRs, interface contracts
-│   ├── quality/           # Test plans, acceptance docs
-│   ├── release/           # Release notes, rollback plans
-│   ├── exec-plans/        # Execution plans (active/completed)
-│   ├── domain/            # Business domain knowledge
-│   └── generated/         # [CI-generated] db-schema, api-changelog
-├── people/{user-id}/      # Personal context (AI read-only)
-├── playbooks/             # Locked task contracts (canonical, AI cannot modify)
-├── pages/                 # Wiki main pages (AI auto-generated)
-└── inbox/                 # Draft pages pending review
+├── README.md               ← Dual-audience entry (AI instructions on top, human guide below)
+├── CLAUDE.md               ← AI collaboration contract + prohibited behaviors
+├── AGENTS.md               ← AI navigation map (≤50 lines)
+├── .sources.yaml           ← External source registry
+│
+├── glossary/               ← Term anchors — write here first, reference everywhere else
+├── design/                 ← Architecture · solutions · ADRs (distinguished by `type`)
+├── requirements/           ← PRDs, user stories, acceptance criteria
+├── flows/                  ← Core business process flows
+├── apis/                   ← Interface contracts, field mappings
+├── data/                   ← Data models, DDL, storage docs
+├── ops/                    ← Runbooks, alerts, traffic protection
+├── incidents/              ← Post-mortems
+├── bizrules/               ← Business rules shared across ops and engineering
+├── meetings/               ← Meeting notes
+└── people/{user-id}/       ← Personal context (AI read-only)
 ```
 
+The `design/` directory uses a `type` frontmatter field to distinguish three subtypes:
+
+| `type` | Use case |
+|--------|---------|
+| `architecture` | Living system architecture doc, continuously updated |
+| `solution` | Technical design snapshot for a specific requirement |
+| `adr` | Architecture Decision Record — captures the *why* |
+
+<details>
+<summary>Full directory spec and root file templates →</summary>
+
+See [`references/directory-structure.md`](references/directory-structure.md) for the complete directory tree, per-directory responsibilities, and starter templates for `README.md`, `CLAUDE.md`, `AGENTS.md`, and `.sources.yaml`.
+
+</details>
+
 ---
 
-## 📋 All Commands
+## Template Library
+
+> [!NOTE]
+> New in **v0.6.0** — each of the 12 knowledge types now has a dedicated body scaffold, enforced at ingestion time.
+
+Instead of a generic TL;DR + details format, every type gets purpose-built structure:
+
+| Template | Level | Contents |
+|----------|-------|---------|
+| `glossary.md` | L1 | Term · synonyms · field mappings · boundaries |
+| `architecture.md` | L1 | Service topology · module responsibilities · dependencies |
+| `adr.md` | L1 | Alternatives · tradeoffs · consequences |
+| `requirement.md` | L1 | User stories · acceptance criteria |
+| `solution.md` | L2 | Background · detailed design · impact |
+| `flow.md` | L2 | Trigger · main flow · exception branches |
+| `incident.md` | L2 | Timeline · 5 Whys · action items with owners |
+| `bizrule.md` | L2 | Conditions · formulas · change history |
+| `api.md` | L3 | Request · response · error codes |
+| `data.md` | L3 | DDL · fields · indexes |
+| `ops.md` | L3 | Timeouts · alerts · rate limits |
+| `meeting.md` | — | Discussion points · conclusions · action items |
+
+The ingestion flow runs **two new checkpoints**:
+
+- **Step 2.5 — Template loading**: AI reads `_registry.yaml`, locates the matching scaffold, and structures the body before writing.
+- **Step 8.5 — Quality gate**: Validates all `required_sections` and runs `quality_gate` checks. Blocks and returns a missing-items list if any section fails.
+
+**Example quality gates:**
+
+| Type | Gate |
+|------|------|
+| `glossary` | Must include ≥1 technical field name mapping (backend / DB / frontend) |
+| `incident` | Each action item needs an owner + deadline; root cause must go beyond surface symptoms |
+| `api` | All request/response fields must include types; ≥1 error code required |
+| `bizrule` | Logic must be implementable in code — concrete formula or decision branches required |
+
+<details>
+<summary>Full registry and gate specs →</summary>
+
+See [`references/templates/_registry.yaml`](references/templates/_registry.yaml) for all type definitions and gate rules.
+
+Design rationale and comparison with GSD Artifact Taxonomy: [`DESIGN.md`](./DESIGN.md) — Section IX.
+
+</details>
+
+---
+
+## Document Format
+
+Every knowledge entry uses YAML frontmatter:
+
+```yaml
+---
+title: Print Service Timeout Mechanism
+type: ops
+tags: [print, timeout, fallback]
+owner: "@hanqiang"
+created: 2026-05-12
+expires: 2026-08-12        # Default: 90 days from creation. Use "never" for permanent docs.
+status: draft              # draft | active | deprecated | canonical
+sources:
+  - "Manual entry @hanqiang 2026-05-12"
+related:
+  - "[[print-service-overview]]"
+---
+```
+
+**Status lifecycle:**
 
 ```
-/knowledge-wiki init [path]               # Initialize KB (3 phases: create → install → execute)
-/knowledge-wiki ingest <source>           # Import docs (11+ formats + Xuecheng/Lark/Apipost)
-/knowledge-wiki ask "<question>"          # RAG Q&A (BM25 + Dense + GraphRAG + parent-child chunks)
-/knowledge-wiki reason "<complex-q>"      # ReACT reasoning (auto-orchestrates tools & search)
-/knowledge-wiki wiki [--enable|--disable] # Wiki mode toggle & auto-generate/update pages
-/knowledge-wiki graph [path]              # Generate local knowledge graph HTML (zero deps)
-/knowledge-wiki search <query>            # Hybrid search (raw results, no answer generated)
-/knowledge-wiki lint [path]               # Check broken links, orphan pages, missing frontmatter
-/knowledge-wiki eval [path]               # E2E evaluation (recall, BLEU-4, ROUGE-L, hallucination)
-/knowledge-wiki export <format>           # Export as jsonl / qa-pairs / graphrag
-/knowledge-wiki status                    # KB health overview
-/knowledge-wiki sync [base_ref]           # Pre-push change analysis (auto-called by hook)
-/knowledge-wiki source add <url> [opts]   # Register persistent sync source
-/knowledge-wiki source list               # List all sources (with status & last sync time)
-/knowledge-wiki source sync [id]          # Incremental sync (hash diff, auto-skip unchanged)
-/knowledge-wiki source remove <id>        # Remove source (keeps generated pages)
+draft ──(health audit)──▶ active ──(health deprecate)──▶ deprecated
+                                ╲
+                                 ──(manual promotion)──▶ canonical
 ```
 
----
-
-## 📄 Supported Document Formats
-
-**Local files:** Markdown · PDF · Word (.docx) · TXT · Images (OCR) · CSV/Excel · PPT (.pptx) · JSON · Code directories · Conversation logs
-
-**Online platforms:**
-
-| Platform | Access | Features |
-|----------|--------|----------|
-| Lark `larkoffice.com` | Lark login | TOC tree + structured body extraction |
-| Apipost `docs.apipost.net` | Public, no login | API params auto-converted to entity pages |
-| Web pages `https://...` | Public | Body text extraction, nav noise removed |
+| Status | Meaning | AI behavior |
+|--------|---------|-------------|
+| `draft` | Unconfirmed | Can reference; not a decision basis |
+| `active` | Confirmed valid | Normal retrieval and citation |
+| `deprecated` | No longer valid | Must not be cited |
+| `canonical` | Authoritative and locked | Highest priority; AI must not modify |
 
 ---
 
-## 🔬 Retrieval Architecture
+## Git Hooks
 
-Four-layer hybrid retrieval for `/knowledge-wiki ask`:
+`/knowledge-wiki init` installs two hooks automatically:
 
-| Layer | Method | Purpose |
-|-------|--------|---------|
-| 1. BM25 | ripgrep full-text scan on `pages/` | Exact keyword matching |
-| 2. Dense | `.kb-meta/chunks.jsonl` top-K | Semantic vector similarity |
-| 3. GraphRAG | `graph.json` 1-hop neighbors | Related context enrichment |
-| 4. Parent-child chunks | Child hit → supplement parent chunk | Prevents semantic truncation |
+### `pre-push` — blocking
 
-**Fusion ranking:** high backlink_count → canonical (highest priority) → deprecated (auto-demoted)
+Runs before every `git push`. Checks for:
 
----
+- Knowledge docs expiring within **7 days** or already expired
+- External sources in `.sources.yaml` not synced for **>30 days**
 
-## 🧪 Evaluation
+If issues are found:
+
+```
+[1] Handle now   [2] Skip   [3] Abort push
+```
+
+> [!IMPORTANT]
+> The hook is **completely silent when there are no issues** — it will never slow down a clean push.
+
+### `commit-msg` — advisory
+
+Triggers when your commit message contains `[kb]`:
 
 ```bash
-/knowledge-wiki eval
-
-# Sample output:
-# Retrieval   Recall Hit Rate: 0.87  Precision: 0.79
-# Generation  BLEU-4: 0.43  ROUGE-L: 0.61  Hallucination: 4.8%
-# End-to-end  P50: 1.2s  P95: 2.8s
+git commit -m "fix: resolve print timeout not resetting [kb]"
+# → Hint: ops/print-timeout.md exists in knowledge base — consider updating it
 ```
 
----
-
-## 🏗 Methodology
-
-knowledge-wiki draws from established practices:
-
-- **AI-DLC Framework** — directory layering, AGENTS.md convention, CI gates, generated/ isolation
-- **Zettelkasten** — atomic notes + explicit link networks
-- **GraphRAG (Microsoft)** — community detection + graph summaries + hierarchical retrieval
-- **ReACT Framework** — Thought-Action-Observation progressive reasoning loop
-- **Obsidian WikiLinks** — bidirectional links and backlink tracking
-- **RAG Best Practices** — semantic chunking + parent-child chunks + BM25/Dense hybrid
-
-See [`references/methodology.md`](./references/methodology.md) for details.
+Does not block the commit. Output is advisory only.
 
 ---
 
-## 📐 Project Structure
+## External Sources
 
-This skill uses progressive disclosure — `SKILL.md` is the navigation entry with command summaries; details live in on-demand `references/`:
+Register external docs you want to track for changes in `.knowledge/.sources.yaml`:
 
-| File | Content | When to read |
-|------|---------|-------------|
-| `references/kb-structure.md` | KB directory structure details | During init or restructuring |
-| `references/doc-standards.md` | Frontmatter / WikiLink / chunking rules | Before ingest or wiki writes |
-| `references/retrieval-config.md` | Retrieval parameter details (threshold/top_k/mode) | When tuning recall quality |
-| `references/agents-claude-spec.md` | AGENTS.md / CLAUDE.md template spec | When generating governance files |
-| `references/methodology.md` | 6 methodology sources in depth | Understanding design philosophy |
-| `references/ingest-pipeline.md` | Agent processing flow + error handling | During ingest execution |
-| `references/output-templates.md` | Output format examples for each command | When you need format examples |
-| `references/data-schemas.md` | graph.json / sources.json / eval dataset schemas | When reading/writing metadata |
-| `references/lint-rules.md` | Lint rule auto-fix suggestions | When lint reports errors |
-| `references/scripts/` | 5 script templates (copied during init) | During init phase |
+```yaml
+sources:
+  - id: print-api-doc
+    name: Print API Docs
+    url: https://docs.apipost.net/docs/detail/xxx
+    tracked_by: "@hanqiang"
+    last_hash: ""
+    last_synced: ""
+    status: active          # active | stale | error
+    related_docs:
+      - apis/print-api.md
+```
+
+`/knowledge-wiki health scan` fetches each registered URL, computes a content hash, and notifies you on changes — **without auto-overwriting** your local docs.
 
 ---
 
-## 📜 License
+## Tool Dependencies
 
-Internal tool — Anthony
+`/knowledge-wiki init` auto-checks dependencies before creating any files.
+
+### Group A — Required
+
+| Tool | Required | Purpose |
+|------|:--------:|---------|
+| `rg` (ripgrep) | ✅ | Full-text search and backlink tracing |
+| `git` | ✅ | Hook installation |
+| `jq` | optional | Frontmatter parsing in hook scripts |
+
+### Group B — Browser Automation (for URL ingestion)
+
+> [!NOTE]
+> All optional. Any single tool from this group enables URL ingestion.
+
+| Tool | Best for |
+|------|---------|
+| `agent-browser` | General AI-native use (preferred default) |
+| `browser-harness` | Dynamic pages with unstable selectors |
+| `playwright` | Fixed-flow batch ingestion pipelines |
+| `browser-use` | Multi-step LLM autonomous decisions |
+| `page-agent` | Chinese-language websites |
+
+```bash
+bash references/scripts/check-deps.sh                    # Check only
+bash references/scripts/check-deps.sh --install          # Install missing Group A tools
+bash references/scripts/check-deps.sh --install-browser  # Install all Group B tools
+```
+
+Auto-selects the right package manager: `brew` · `apt` · `yum` · `npm` · `pipx`.
+
+---
+
+## Design Principles
+
+1. **No source, no write, no answer** — `sources` is required on every entry; `ask` says "not found" rather than guessing.
+2. **Single term definition** — Definitions live in `glossary/`; all other docs reference via `[[slug]]`.
+3. **Draft-first** — New entries default to `status: draft`; human promotion required via `health audit`.
+4. **Zero-index tracing** — Backlinks and forward refs scan Markdown directly with `rg`; no index files to maintain.
+5. **Silent on pass** — Hooks and `health rot` produce no output when everything is clean.
+6. **Deprecate must resolve references** — `health deprecate` uses `rg` to find all references before marking deprecated; prevents dangling links.
+7. **Tool gate on init** — `init` aborts if required tools are missing; no partial state.
+8. **Template as contract** *(v0.6.0)* — Ingestion body must follow `templates/{type}.md` scaffold exactly; AI cannot add/remove top-level headings; Step 8.5 gate enforces required sections.
+
+---
+
+## Usage Examples
+
+<details>
+<summary>Ingestion examples</summary>
+
+```bash
+# From a Feishu doc
+/knowledge-wiki in https://xxx.feishu.cn/docx/xxx
+
+# From a Feishu wiki page
+/knowledge-wiki in https://xxx.feishu.cn/wiki/xxx
+
+# Free-text entry
+/knowledge-wiki in "Print service timeout is 30s; falls back to local cache on timeout"
+
+# Extract design knowledge from source code
+/knowledge-wiki in ./src/print/service.go
+
+# Register an external source for ongoing tracking
+/knowledge-wiki in source add https://docs.apipost.net/docs/detail/xxx --name "Print API Docs"
+```
+
+</details>
+
+<details>
+<summary>Query and tracing examples</summary>
+
+```bash
+# Ask a question — answer always cites source docs
+/knowledge-wiki ask "What is the print service timeout?"
+
+# Who links to this doc?
+/knowledge-wiki ask links print-timeout
+
+# What does this doc link to?
+/knowledge-wiki ask refs print-timeout
+```
+
+</details>
+
+<details>
+<summary>Maintenance examples</summary>
+
+```bash
+# Check for external source updates
+/knowledge-wiki health scan
+
+# List expired or expiring docs
+/knowledge-wiki health rot
+
+# Confirm a doc is still valid (resets expiry +90 days)
+/knowledge-wiki health audit print-timeout
+
+# Deprecate an outdated doc (resolves all references first)
+/knowledge-wiki health deprecate old-print-config
+```
+
+</details>
+
+---
+
+## Resource Index
+
+| File | Purpose |
+|------|---------|
+| [`SKILL.md`](./SKILL.md) | Skill entry — tool tables, subcommand scaffold, AI invocation rules |
+| [`DESIGN.md`](./DESIGN.md) | Architecture rationale, layering model, template library design |
+| [`references/directory-structure.md`](references/directory-structure.md) | `.knowledge/` tree + root file templates |
+| [`references/ingestion-rules.md`](references/ingestion-rules.md) | 11-step ingestion flow, slug rules, quality gates |
+| [`references/ask-rules.md`](references/ask-rules.md) | Two-layer retrieval, answer format, expiry, links/refs |
+| [`references/health-rules.md`](references/health-rules.md) | rot · scan · coverage · audit · deprecate specs |
+| [`references/url-handling.md`](references/url-handling.md) | URL routing rules, Feishu subflow, scan routing |
+| [`references/templates/_registry.yaml`](references/templates/_registry.yaml) | Central type → template + required sections + gates |
+| [`references/scripts/check-deps.sh`](references/scripts/check-deps.sh) | Dependency checker + installer |
+
+---
+
+## Changelog
+
+See [`CHANGELOG.md`](./CHANGELOG.md) for full version history.
+
+---
+
+<div align="center">
+
+Built for teams that want their knowledge to stay alive, not just archived.
+
+</div>

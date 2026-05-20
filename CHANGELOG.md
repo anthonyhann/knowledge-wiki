@@ -1,229 +1,208 @@
-# CHANGELOG
+# Changelog
 
-本文档记录 knowledge-wiki skill 的所有重要变更。
-格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
+本文件记录 `knowledge-wiki` skill 的所有重要变更。版本号采用语义化版本（MAJOR.MINOR.PATCH），日期为 UTC+8。
 
----
-
-## [未发布]
-
-### 重构
-
-- **SKILL.md 渐进式披露重构**（1796 行 → 432 行，精简 76%）
-  - 嵌入式脚本模板外移至 `references/scripts/`（5 个脚本，含 `kb-sync.sh`、`generate-dashboard.py`、`pre-push-hook.sh`、`check-all.sh` 等）
-  - 详细规范、模板、数据结构外移至 9 个 `references/*.md` 文件：
-    - `references/kb-structure.md` — 知识库目录结构详解
-    - `references/doc-standards.md` — 文档规范（frontmatter / WikiLink / 分块规则）
-    - `references/retrieval-config.md` — 检索配置详解
-    - `references/agents-claude-spec.md` — AGENTS.md / CLAUDE.md 模板规范
-    - `references/methodology.md` — 方法论来源
-    - `references/ingest-pipeline.md` — Agent 处理流程 + 异常处理 + 代码提取规则
-    - `references/output-templates.md` — 各命令输出格式示例
-    - `references/data-schemas.md` — graph.json / sources.json / eval 数据集结构
-    - `references/lint-rules.md` — lint 规则的自动修复建议
-  - SKILL.md 仅保留命令清单、核心摘要、引用指针；细节按需读取 references/*
-  - frontmatter `description` 扩展触发词列表
-- **D3+D4 维度强化**：ingest 流程新增异常处理表格（超大文件/网络中断/格式解析失败/重复导入/graph.json 损坏）+ 检查点（Step 1 与 Step 4 后用户确认）；reason 流程新增推理中断机制和异常场景表格
-- **D5+D8 维度强化**：ask 命令新增零结果 fallback 流程；lint 规则补全自动修复建议；export 补充 jsonl/qa-pairs/graphrag 三种格式输出示例；wiki / reason / init 补全详细输出格式示例
-
-### 修复
-
-- **W003**：README.md 在标题下方补充 `## 概述` 章节，符合 myt-skill-linter 规范
-
-### 新增
-
-- **test-prompts.json** — 评估测试用例集，覆盖 `init`、`ingest`、`ask` 三种典型场景
-
-### 变更
-
-- **`/knowledge-wiki init` 升级为三阶段初始化**，执行完成后知识库立即可用，无需手动运行任何脚本
-  - Phase 1：创建结构与生成文件（目录结构 + 治理文件 + `.kb-meta/` 空 JSON 文件）
-  - Phase 2：安装脚本（5 个脚本全部写入并 `chmod +x` + 安装 `.git/hooks/pre-push`）
-  - Phase 3：首次执行（立即运行 `generate-docs.sh`、`generate-dashboard.py`、`check-all.sh`）
-  - 新增 init 完成摘要输出（目录状态、脚本清单、生成文件状态、健康报告、下一步引导）
-
-- **`docs/` 目录重构为按项目生命周期分区**（方案 B）
-  - `requirements/` — 需求阶段（PRD、需求文档、UI 设计图）
-  - `design/` — 设计阶段（技术方案、流程图、PUML 图）
-  - `implementation/` — 开发阶段（ADR、接口约定）
-  - `quality/` — 质量保障（测试方案、用例、验收文档）
-  - `release/` — 上线阶段（上线文档、回滚方案）
-  - `exec-plans/` — 执行计划（active/completed/tech-debt-tracker）
-  - `domain/` — 业务领域知识（按领域子目录）
-  - `generated/` — CI 自动生成（db-schema/api-changelog/dependency-graph）
-
-- **pre-push hook 升级为三步流程**
-  - 步骤 0（新增）：自动生成 — 刷新 `docs/generated/` 和 `dashboard.md`，变更文件自动暂存
-  - 步骤 1：同步源陈旧检测（原有）
-  - 步骤 2：代码变更 → 文档映射（原有）
-
-### 新增
-
-- **四个缺失脚本模板补齐**（均内嵌于 SKILL.md，init 时写入）
-  - `generate-dashboard.py` — 从 `.kb-meta/stats.json` + `sources.json` + `eval-results.json` 渲染 `dashboard.md`
-  - `generate-docs.sh` — 生成 `docs/generated/db-schema.md`（SQL migration 文件）和 `api-changelog.md`（git diff 接口文件）
-  - `check-all.sh` — frontmatter 校验、行数超限、WikiLink 断链，自动跳过 `generated/` 和 `.kb-meta/`
-  - `install-hooks.sh` — 手动安装 pre-push hook 的备用路径
-
-### 新增
-- **`/knowledge-wiki source`** — 持久化同步源管理
-  - `source add <url>` — 注册同步源，支持学城/飞书/Apipost/普通 URL
-  - `source list` — 查看所有源状态（active/stale/error/paused）
-  - `source sync [id]` — 增量同步（hash 对比，内容无变化自动跳过）
-  - `source remove <id>` — 移除注册（不删除已生成页面）
-  - `source status` — 聚合健康状态视图
-  - 注册表存储：`.kb-meta/sources.json`（含 id/url/type/recursive/tags/last_hash/last_synced/status/page_count）
-
-- **pre-push hook 双检查机制** — 在原有"代码变更→文档映射"检查基础上新增"同步源陈旧检测"
-  - 检查一：扫描 `sources.json`，标记 `stale`（>7天）或 `error` 状态的源
-  - 检查二：调用 `kb-sync.sh` 分析 git diff
-  - 两个检查独立运行，不短路，用户一次看到所有待处理事项
-  - 交互从三选一升级为四选一：source sync / wiki 更新 / 两者都做 / 跳过
-
-- **在线平台文档导入**（`/knowledge-wiki ingest <url>`）
-  - 学城（km.sankuai.com）：heading/cell/textbox 结构提取，需美团内网登录态
-  - 飞书文档（larkoffice.com）：list/heading 目录树提取，需飞书登录态
-  - Apipost 文档（docs.apipost.net）：目录树遍历 + 接口 entity 页生成，公开访问无需登录
-  - 登录态检测逻辑：检测到跳转登录页时自动中止并提示用户
-  - 新增 `--recursive` 参数：递归抓取整个文档树
-  - 新增 `--url-file` 参数：批量导入多个 URL
-
-- **FAQ 知识库类型**（`type: faq`）
-  - 使用问答对结构（`### Q:` / `**A:**`），每个 Q&A 独立成块
-  - RAG 召回新增 Layer 0：先在 faq 页精确匹配问题文本，命中直接返回（置信度 high）
-  - ingest 时自动检测"Q:"/"常见问题"模式，建议使用 faq 格式
-  - 与 concept/entity 对比：分块策略不同，召回优先级不同
-
-- **持久化检索配置**（SCHEMA.md `retrieval:` 块）
-  - 支持 6 个参数：threshold / top_k / default_mode / rerank / faq_exact_match / context_window
-  - 优先级：命令行参数 > SCHEMA.md 配置 > 内置默认值
-  - `source_stale_days` 参数：控制同步源 stale 判定天数（默认 7）
-
-### 计划中
-- `references/` llms.txt 格式约定与自动同步机制
-- `people/` CODEOWNERS 文件自动生成
-- `/knowledge-wiki sync` 变更映射规则可配置化（支持自定义规则文件）
-- 同步源定时自动刷新（cron 模式）
+变更类型说明：
+- **Added** 新增功能
+- **Changed** 已有功能调整
+- **Refactored** 重构（不改变外部行为）
+- **Fixed** 缺陷修复
+- **Removed** 移除
 
 ---
 
-## [1.0.0] - 2026-05-07
+## [0.6.0] - 2026-05-20
 
-首次发布。基于与用户的完整需求问询和多轮迭代设计，融合内网 AI-DLC 框架、Zettelkasten、GraphRAG、ReACT 等领域最佳实践。
+### Added
 
-### 新增 — 三大核心能力
+- **type 级模板库（核心特性）**：为 12 个 type 各提供专属正文骨架，解决「一床被子盖所有场景」的二段式问题。
+  - `references/templates/_registry.yaml`（中央注册表）— 登记每个 type 的模板文件、必填段（required_sections）、可选段（optional_sections）、质量门禁（quality_gate）、目标目录、L1/L2/L3 层级、默认 expires_days。
+  - `references/templates/glossary.md` — L1 术语定义（同义词与别名表 / 技术字段映射 / 边界）。
+  - `references/templates/architecture.md` — L1 架构现状（服务拓扑表 / 模块职责 / 关键依赖 / 部署形态）。
+  - `references/templates/solution.md` — L2 技术方案（背景目标 / 详设计 / 影响面 / 备选方案 / 风险回滚）。
+  - `references/templates/adr.md` — L1 架构决策（背景 / 决策 / 至少 2 个备选 / 取舍理由 / 后果）。
+  - `references/templates/requirement.md` — L1 需求文档（用户故事 / 验收标准 Given-When-Then）。
+  - `references/templates/flow.md` — L2 业务流程（触发条件 / 主流程编号步骤 / 异常分支 / 人工介入节点）。
+  - `references/templates/api.md` — L3 接口约定（Header/Query/Body / 响应结构 / 错误码 / 限流超时）。
+  - `references/templates/data.md` — L3 数据模型（DDL / 字段定义 / 索引策略 / Redis Key 命名）。
+  - `references/templates/ops.md` — L3 运维手册（运行参数数值 / 告警阈值 / 大促保障 / 故障预案）。
+  - `references/templates/incident.md` — L2 故障复盘（时间线 / 5 Whys 根因 / 改进措施带责任人与截止日 / Use Case 价值）。
+  - `references/templates/bizrule.md` — L2 业务规则（适用条件 / 计算公式或分支 / 边界场景 / 历史变更）。
+  - `references/templates/meeting.md` — 辅助 会议记录（讨论要点 / 结论 Action 带责任人）。
 
-- **RAG 快速问答** (`/knowledge-wiki ask`)
-  - BM25 稀疏召回 + Dense 稠密召回 + GraphRAG 图谱增强 + 父子分块四路混合检索
-  - 检索阈值调节（`--threshold`、`--top-k`、`--mode bm25/dense/graph`）
-  - 多轮上下文感知，话题切换时自动重置检索范围
-  - 每次回答后基于知识图谱自动生成 3 条推荐问题
-  - 输出含置信度（high/medium/low）和参考来源标注
+- **录入流程从 9 步升级为 11 步**：
+  - **Step 2.5 模板加载** — AI 推断出 type 后必须读 `_registry.yaml` 定位到 `templates/{type}.md`，按其骨架整理正文。禁止用「TL;DR + 详情」二段式覆盖所有 type。
+  - **Step 8.5 质量门禁** — 写入前逐项检查 required_sections 是否齐备并运行 quality_gate 文本校验。任一项不达标拦截写入并返回缺失清单。
 
-- **ReACT 智能推理** (`/knowledge-wiki reason`)
-  - Thought → Action → Observation 渐进式多步推理循环
-  - 自主编排内置工具（kb_search、kb_read、kb_write、kb_graph_neighbors）
-  - 自动发现并调用已安装的 MCP 工具
-  - 网络搜索兜底，结果自动提示入库
-  - 推理深度控制（`--max-steps`、`--no-web`、`--no-mcp`、`--verbose`）
+- **执行原则第 9 条**：「模板为合约」— 录入正文必须严格按 `references/templates/{type}.md` 骨架生成；AI 不允许自行增删一级标题。
 
-- **Wiki 自动生成** (`/knowledge-wiki wiki`)
-  - `--enable/--disable` 开关控制是否在 ingest 后自动触发
-  - 草稿写入 `inbox/`，通过质量门控后升级为 stable
-  - 质量门控：TL;DR 必填、至少 1 个入站链接、无断链、sources 非空
-  - 72 小时决策入库规则：Agent 发现决策点时自动提示
+- **DESIGN.md 第九节「模板库机制」**：补充与 GSD Artifact Taxonomy 的对照表（XML 标签 vs HTML 注释、`must_haves` vs `required_sections+quality_gate`、Workflow 路由 vs type 推断）；附「新增 type 的标准 4 步流程」。
 
-### 新增 — 知识库初始化
+### Changed
 
-- **`/knowledge-wiki init`** — 一键初始化完整知识库
-  - 生成 `CLAUDE.md`（AI 协作契约 + 禁止行为清单，Agent 每次必读）
-  - 生成 `AGENTS.md`（AI 专用导航地图，硬限 100 行，超限拆分至 AGENT-ROUTING.md）
-  - 生成 `AGENT-ROUTING.md`（各 Agent 身份的可读/可写/禁止写三列路由表）
-  - 生成 `CONTRIBUTING.md`（人类参与指南，AI 无需读取）
-  - 生成 `README.md`（双受众入口，顶部给 AI，底部给人类）
-  - 自动安装 `.git/hooks/pre-push`（push 前知识库同步检查）
-  - 自动生成 `processes/scripts/kb-sync.sh`（变更分析脚本）
-  - 两个脚本模板内嵌于 SKILL.md，init 时直接读取写入，无外部依赖
+- `references/ingestion-rules.md`：「type 映射表」从 2 列升级为 5 列（type / 写入目录 / 模板文件 / 层级 / 默认 expires），声明 `_registry.yaml` 为唯一权威源。
+- `SKILL.md` 资源索引表新增两行（`_registry.yaml` 与 `templates/{type}.md`）；AI 结构化流程节升级为 11 步并强调禁止覆盖二段式。
+- `README.md` 新增「模板库（v0.6.0 新增）」章节，列出 12 个模板的层级与必填段速览。
 
-### 新增 — 文档导入
+### Design Rationale
 
-- **`/knowledge-wiki ingest`** — 支持 11 种格式
-  - Markdown、PDF、Word (.docx)、TXT、HTML/URL、图片（OCR）
-  - CSV/Excel、PPT (.pptx)、JSON、代码目录、对话记录
-  - 自动识别文档类型，提取核心概念、实体、流程步骤、决策点
-  - 代码目录提取：模块/包 → entity 页，关键注释 → synthesis 草稿
-  - `--update` 增量模式：只处理新增/变更文件
+早期所有 type 共享一套「TL;DR + 详情」二段式，落地中暴露三个问题：
 
-### 新增 — 知识图谱可视化
+- `glossary` 缺同义词与技术字段名映射 → 前后端语义仍割裂
+- `incident` 缺时间线 / 5 Whys / 改进措施责任人 → Use Case 无法反哺 AI
+- `api` 缺请求/响应字段表 / 错误码 / 超时限流 → AI 生成代码时仍需重新推导
 
-- **`/knowledge-wiki graph`** — 生成零依赖本地 HTML
-  - D3.js v7 力导向布局，节点大小按 backlink_count 缩放
-  - 类型着色：concept 蓝 / entity 绿 / process 橙 / source 灰
-  - `canonical` 节点金色边框，`deprecated` 节点半透明
-  - 交互：点击高亮邻居、悬停显示 TL;DR、搜索框实时过滤、类型筛选器
-  - `graph.json` 数据结构：nodes（id/label/type/tags/status/backlink_count/tldr）+ links（source/target/relation）
+参考 GSD 的 Artifact Taxonomy（40+ 个模板覆盖项目生命周期不同阶段产出），knowledge-wiki 采用「type 一对一专属模板 + 中央注册表 + 8.5 质量门禁」实现轻量但严格的合约化产出。
 
-### 新增 — 质量保障
+### Files
 
-- **`/knowledge-wiki lint`** — 10 项检查
-  - ERROR：断链、frontmatter 缺失、deprecated 文档被引用
-  - WARNING：孤立页面、TL;DR 缺失、unverified 标注未处理、last-reviewed > 90 天
-  - CI ERROR：单文件超 800 行
-  - INFO：循环依赖检测
-- **`/knowledge-wiki eval`** — 端到端评测
-  - 检索层：召回命中率、精确率、平均召回延迟
-  - 生成层：BLEU-4、ROUGE-L、幻觉率
-  - 全链路：P50/P95 端到端延迟
-  - 输出 Top 3 失败案例分析和改进建议
-- CI pre-commit hook：硬性阻断 frontmatter 错误、断链、deprecated 引用、超行数
+- 新增 13 个文件（`templates/_registry.yaml` + 12 个 `.md` 模板）
+- 修改 3 个文件（`SKILL.md` / `references/ingestion-rules.md` / `DESIGN.md`）
 
-### 新增 — Git 集成
+---
 
-- **`/knowledge-wiki sync`** — push 前知识库同步检查
-  - 分析 `git diff` 变更文件，按规则映射到 `.knowledge/` 对应文档
-  - 映射规则：`<skill>/SKILL.md` → `pages/entities/<skill>.md` 等 5 类规则
-  - 三选一交互：立即更新 / 有补充内容 / 跳过直接推送
-  - 退出码 0 = 无需同步，1 = 有待同步文档
-  - `git push --no-verify` 临时跳过
+## [0.5.0] - 2026-05-13
 
-### 新增 — 数据导出（AI-DLC 友好）
+### Added
 
-- **`/knowledge-wiki export jsonl`** — RAG embedding 就绪分块数据
-- **`/knowledge-wiki export qa-pairs`** — Instruction Tuning 问答对（Agent 自动生成）
-- **`/knowledge-wiki export graphrag`** — GraphRAG 社区摘要格式
-- **`/knowledge-wiki export llms-txt`** — references/ llms.txt 友好版本
+- **Group B 浏览器工具生态全面接入**：`check-deps.sh` 新增对 5 个浏览器自动化工具的检测——`agent-browser`（轻量瑞士军刀）、`browser-harness`（自愈浏览器手）、`playwright`（工程化测试基石）、`browser-use`（LLM 自主大脑）、`page-agent`（中文领域专家）。
+- **`--install-browser` 一键装组**：脚本新增 `bash check-deps.sh --install-browser` 模式，按当前 OS 自动安装缺失的全部浏览器工具（npm / pipx 双通道）。
+- `SKILL.md` 与 `references/url-handling.md` 同步加入"工具一句话定位 + 选型矩阵"，明确各工具适用场景与缺失影响。
 
-### 新增 — 状态监控
+### Changed
 
-- **`/knowledge-wiki status`** — 统计/健康/RAG 就绪度/最新评测一屏展示
+- 工具依赖按 **两组** 重新组织：Group A 核心工具（rg/git/jq）、Group B 浏览器生态（任选其一）。
+- Group B 全部为 OPTIONAL；脚本检测到「全部未装」时输出选型建议+安装清单，「至少一个已装」时主流程不阻断。
 
-### 新增 — 目录结构与治理
+### Fixed
 
-- **双受众分离**：CLAUDE.md（AI 契约）+ CONTRIBUTING.md（人类指南）职责隔离
-- **`status: canonical`** 权威锁定，AI 禁止修改
-- **`status: deprecated`** 自动降权，禁止引用，强制转向 `links.supersedes`
-- **生成文件物理隔离**：graph.json、graph.html、dashboard.md、.kb-meta/、docs/generated/ 均标注「CI 生成，禁止手动编辑」
-- **exec-plans 状态分区**：`active/` 进行中 + `completed/` 只读归档
-- **AGENTS.md 防膨胀**：超 100 行强制拆分至 AGENT-ROUTING.md
+- `check-deps.sh` 在 macOS 默认 bash 3.2 下报 `local: -n: invalid option`：将 nameref 语法改为 `eval` 间接展开数组。
+- `check-deps.sh` 在严格模式 + 中文字符下报 `desc: unbound variable`：移除 `set -u`，并将输出中的 `（可选）` 替换为 ASCII `[optional]`，避免 bash 3.2 的 `read` 误判多字节边界。
 
-### 新增 — people/ 层
+### Commit
 
-- `people/{user-id}/context.md` — 角色、技能图谱、负责模块、当前迭代焦点、跨团队协作接口、阻塞事项
-- `people/{user-id}/decisions.md` — 个人决策日志（append-only，禁止修改历史条目）
-- `people/{user-id}/prefs.md` — Agent 协作偏好（回答风格、上下文缩写、禁止行为）
-- Agent 使用场景：任务分配推理、周报生成、代码 review 归属
-- 权限：CODEOWNERS 限制只有本人可写，AI 只读
+- `916f7f5` D3+D5: check-deps.sh 扩充 5 个浏览器工具 + --install-browser 一键装组 + SKILL.md 三组工具表
 
-### 新增 — 文档规范
+---
 
-- 标准 frontmatter 11 个字段（title/type/status/created/updated/last-reviewed/owner/tags/sources/confidence/links）
-- WikiLink 三种语法（`[[page]]`、`[[page|alias]]`、`[[page#section]]`）
-- AI-DLC 约束 6 条：TL;DR 独立成块、平坦化结构、显式引用、术语一致性、代码可运行、结构化数据块
-- RAG 分块规则：TL;DR（~80 token）/ 定义（~300 token）/ 代码块（完整不截断）/ 20% 重叠
+## [0.4.0] - 2026-05-13
 
-### 设计决策
+### Added
 
-- **pre-push hook 模板内嵌**：两个脚本模板内嵌于 SKILL.md，init 时从 SKILL.md 读取写入目标路径，新项目无需外部依赖
-- **AGENTS.md 100 行上限**：防止导航地图膨胀失效，超限强制拆分到 AGENT-ROUTING.md
-- **三模式路由**：ask（精准快速）/ reason（复杂推理）/ wiki（知识沉淀）针对不同任务复杂度，避免用一种策略硬撑所有场景
-- **草稿优先**：所有自动生成内容一律写入 inbox/，人工确认后升级，防止低质量内容污染 stable 知识库
+- **`init` 子命令 Step 0 工具检查门**：在创建目录前调用 `check-deps.sh`，缺必需工具时三选一（一键安装 / 手动安装重试 / 中止 init）。
+- **执行原则第 8 条**：`init` 必须先跑工具检查，缺必需工具禁止继续后续步骤。
+- 新增 `references/scripts/check-deps.sh`，支持 `--install` 自动安装核心必需工具（macOS=brew / Linux=apt|yum）。
+
+### Refactored
+
+- **SKILL.md 大瘦身**：从 559 行缩减到 262 行（-53%），抽离细则到 4 个 references 子文档：
+  - `references/url-handling.md` — URL 处理铁律 + 子流程 + scan 路由
+  - `references/ingestion-rules.md` — AI 结构化 9 步 + slug + type + frontmatter
+  - `references/ask-rules.md` — 两层检索 + 标准回答 + 时效计算 + links/refs
+  - `references/health-rules.md` — rot/scan/coverage/audit/deprecate 详细流程
+- SKILL.md 保留骨架与索引，所有细节 → 链接跳转，符合 ≤500 行规范要求。
+
+### Commit
+
+- `e8dd42a` D7+D3+D6: init 加 Step 0 工具检查 + 一键安装；抽离 url/ingestion/ask/health 细则到 references
+
+---
+
+## [0.3.0] - 2026-05-12
+
+### Added
+
+- URL 处理章节加入"工具选型决策树"，按目标系统类型分流到不同浏览器工具（Browser Use / Page-Agent / Browser Harness / Agent-Browser / Playwright）。
+- `health scan` 子命令按域名路由：所有 URL 统一走浏览器工具。
+
+### Commit
+
+- `dfb441d` D5+D8: URL 处理加入工具选型铁律
+
+---
+
+## [0.2.x] - 2026-05-11 ~ 2026-05-12
+
+### Added (D4 - cb73e36)
+
+- 三个新检查点：录入更新前的预览确认、外部源移除前的二次确认、`health rot` 批量入口。
+
+### Refactored (D7 - 251010a)
+
+- 抽离 `.knowledge/` 目录树与根文件模板（README/CLAUDE/AGENTS/.sources.yaml）到 `references/directory-structure.md`，SKILL.md 仅保留索引。
+
+### Added (D6 - fc7ef0a)
+
+- 在 SKILL.md 末尾增加 `references/scripts/` 资源索引表，明确每个脚本的用途。
+
+### Added (D3 - 3ea0d7d)
+
+- 三大边界处理：非 git 仓库下 `init` 的降级流程、AI 结构化失败的 3 轮重试机制、`coverage` 报告的项目根识别。
+
+### Added (D5 - 39a07cf)
+
+- 具体化 4 项细则：内容 hash 算法（sha256 主体）、降噪规则（去导航/页脚/广告）、slug 生成方法（kebab-case + 去停用词）、rg 检索模板。
+
+### Commits
+
+- `cb73e36` / `251010a` / `fc7ef0a` / `3ea0d7d` / `39a07cf`
+
+---
+
+## [0.2.0] - 2026-05-10
+
+### Added (Round 3 - dc49f9e)
+
+- D8 实测表现：录入前文件存在性前置检查、`health scan` 异常 fallback 流程、缺失文档时的明确报错。
+
+### Added (Round 2 - a583b15)
+
+- D6 资源整合度：抽离 git hook 脚本（`pre-push.sh` / `commit-msg.sh`）到 `references/scripts/`，SKILL.md 不再内嵌 shell 代码。
+
+### Added (Round 1 - 920afce)
+
+- D5 指令具体性：补 type 推断规则（design 三类区分）、关键词提取方法、URL 录入端到端步骤、coverage 判定逻辑。
+
+---
+
+## [0.1.0] - 2026-05-09
+
+### Added
+
+- **首次发布**（commit `d333eb8`）：团队知识库沉淀 skill。
+- 4 个核心子命令：`init` / `in` / `ask` / `health`。
+- 11 类目录骨架：`glossary/` / `design/` / `requirements/` / `flows/` / `apis/` / `data/` / `ops/` / `incidents/` / `bizrules/` / `meetings/` / `people/`。
+- frontmatter 4 状态：`draft` / `active` / `deprecated` / `canonical`。
+- 默认过期时长 90 天，支持 `expires: never` 长期有效。
+- git hook 双钩子：`pre-push`（过期阻断式确认）+ `commit-msg`（[kb] 标记非阻断提示）。
+- 反向追溯 `ask links <slug>` + 正向追溯 `ask refs <slug>`，基于 rg 零索引。
+- 外部源管理 `.sources.yaml`，`health scan` 检测变更不自动覆盖。
+
+### Changed (53449b8 / e546a94)
+
+- 精简 skill 描述格式，统一 frontmatter 规范。
+- 重命名 skill 目录并优化 SKILL.md 描述。
+
+---
+
+## 评分演进
+
+| 版本 | 综合评分 | 关键改进 |
+|------|---------|---------|
+| 0.1.0 | ~78 | 基线发布 |
+| 0.2.x | ~88 | D5/D6/D7/D8 多轮补强 |
+| 0.3.0 | ~92 | URL 工具选型决策树 |
+| 0.4.0 | ~94 | SKILL.md 重构 -53% + Step 0 工具门 |
+| 0.5.0 | 95.8 | Group B 浏览器生态 + 一键装组 + bash 3.2 兼容 |
+| 0.6.0 | **预期 97+** | type 级模板库 + 8.5 质量门禁 + 与 GSD Taxonomy 对齐 |
+
+---
+
+## 版本号约定
+
+- **MAJOR**：破坏性变更（目录结构调整、frontmatter 字段重命名等需要迁移的改动）
+- **MINOR**：新增子命令、新增工具组、新增 references 文档
+- **PATCH**：缺陷修复、文案调整、脚本兼容性修复
+
+未发布的开发中变更可写在文件顶部 `## [Unreleased]` 区块。
+

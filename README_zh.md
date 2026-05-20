@@ -1,301 +1,421 @@
-<h1 align="center">📚 knowledge-wiki</h1>
+<div align="center">
 
-<p align="center">
-  <strong>将散落文档转化为结构化、可检索、Agent 可推理的知识库</strong>
-</p>
+# 📚 knowledge-wiki
 
-<p align="center">
-  <a href="./README.md">English</a> ·
-  <a href="./CHANGELOG.md">更新日志</a> ·
-  <a href="./SKILL.md">Skill 规范</a>
-</p>
+**团队知识全生命周期管理 — 零门槛录入、严格溯源、持续维护。**
 
-<p align="center">
-  <img src="https://img.shields.io/badge/触发-%2Fknowledge--wiki-blue" alt="trigger" />
-  <img src="https://img.shields.io/badge/格式-11%2B-green" alt="formats" />
-  <img src="https://img.shields.io/badge/平台-学城%20%7C%20飞书%20%7C%20Apipost-orange" alt="platforms" />
-  <img src="https://img.shields.io/badge/检索-BM25%20%2B%20Dense%20%2B%20GraphRAG-purple" alt="retrieval" />
-</p>
+[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](./CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+[![Claude Skill](https://img.shields.io/badge/claude-skill-orange.svg)](./SKILL.md)
+[![Requires](https://img.shields.io/badge/requires-ripgrep%20%7C%20git-lightgrey.svg)](#工具依赖)
+
+将飞书、Apipost、代码、会议中散落的内容沉淀为结构化、可检索、严格溯源的本地知识库 — 直接集成在 Claude Code 工作流中。
+
+[快速开始](#快速开始) · [命令](#命令) · [模板库](#模板库) · [设计原则](#设计原则) · [更新日志](./CHANGELOG.md)
+
+</div>
 
 ---
 
-## 解决什么问题？
+## 为什么用 knowledge-wiki？
 
-团队的知识散落在学城文档、飞书、Apipost 接口文档、代码注释、会议记录里。每次有人问"这个接口怎么用"、"上次为什么这么设计"，要么翻文档半天，要么问同事，要么靠记忆。新人入职没有自学入口，老人离职知识随之流失。
+大多数团队都面临同样的三个问题：
 
-**knowledge-wiki 把这些散落的知识统一沉淀到一个结构化知识库**，让 AI Agent 能直接检索、推理和回答。
-
-| 痛点 | 解决方式 |
-|------|----------|
-| 🔍 **查不到** — 文档在各个平台，检索要切换好几个工具 | 统一知识库 + 四路混合检索（BM25 + Dense + GraphRAG + 父子分块） |
-| 🕰️ **过时了** — 学城文档更新了，本地没同步，AI 基于旧信息回答 | 持久化同步源 + push 前自动感知变更 |
-| 🧠 **沉淀不住** — 每次代码变更，相关文档没有人更新，知识腐化 | Pre-push Hook 自动检测陈旧文档并提示更新 |
+| 问题 | 现状 | 解决方式 |
+|------|------|---------|
+| **知识散落** | 文档分散在飞书、Notion、群聊和脑子里 | 统一 `.knowledge/` 目录，一条命令录入 |
+| **知识腐烂** | 过期文档悄悄误导决策 | 90 天有效期 + push 前 git hook 自动警告 |
+| **录入门槛高** | 模板复杂，没人愿意写文档 | 类型自动推断 + AI 结构化，直接粘贴即可 |
 
 ---
 
-## ✨ 核心能力
+## 快速开始
 
-| 能力 | 解决什么问题 | 命令 |
-|------|------------|------|
-| **RAG 快速问答** | "这个接口参数是什么？" 类即时查询 | `/knowledge-wiki ask` |
-| **Agent 智能推理** | "结合历史 ADR 分析这个方案的风险" 类复杂推理 | `/knowledge-wiki reason` |
-| **Wiki 自动生成** | 从学城/飞书/代码自动生成结构化知识页面 | `/knowledge-wiki wiki` |
-| **持久化同步源** | 学城文档更新后自动感知，push 前提示同步 | `/knowledge-wiki source` |
+```bash
+# 1. 进入项目根目录
+cd ~/your-project
+
+# 2. 初始化（检查工具、创建 .knowledge/、安装 git hooks）
+/knowledge-wiki init
+
+# 3. 录入第一条知识
+/knowledge-wiki in "打印服务超时阈值是 30s，超时后 fallback 到本地缓存"
+
+# 4. 查询
+/knowledge-wiki ask "打印服务超时"
+
+# 5. 随时做健康检查
+/knowledge-wiki health
+```
+
+> [!TIP]
+> `/knowledge-wiki init` 会自动检测缺失工具并提供一键安装。详见[工具依赖](#工具依赖)。
 
 ---
 
-## 🚀 快速开始
+## 命令
 
-### 1. 初始化知识库
+### 概览
+
+| 命令 | 功能 |
+|------|------|
+| [`init`](#init) | 检查工具 · 创建 `.knowledge/` · 安装 git hooks |
+| [`in`](#录入) | 零门槛录入文字、URL、文件或代码 |
+| [`ask`](#查询) | 严格溯源问答 — 无记录不猜测 |
+| [`health`](#维护) | 腐烂检测 · 外部源扫描 · 覆盖率报告 |
+
+### `init`
 
 ```bash
 /knowledge-wiki init
-# ✓ 创建 .knowledge/ 目录结构（含 docs/ 七个子目录）
-# ✓ 生成治理文件（CLAUDE.md / AGENTS.md / CONTRIBUTING.md）
-# ✓ 安装 5 个脚本（kb-sync.sh / generate-dashboard.py 等，均 chmod +x）
-# ✓ 安装 .git/hooks/pre-push（push 前自动检查 + 生成文档）
-# ✓ 立即生成初始 docs/generated/ 和 dashboard.md
-# ✓ 输出初始健康报告
 ```
 
-### 2. 导入已有文档
+运行 `check-deps.sh`，创建目录结构，并安装两个 git hooks。如缺少必需工具（`rg`、`git`），提供三选一：自动安装 / 手动安装后重试 / 中止。
+
+### 录入
 
 ```bash
+/knowledge-wiki in <文字|URL|文件路径>       # 智能录入，支持任意来源
+/knowledge-wiki in --update <slug>           # 更新已有条目
 
-# 从飞书导入（需飞书登录）
-/knowledge-wiki ingest https://bytedance.larkoffice.com/docx/PW6PdvVPFoNwgjxgRPWcwBrknmc
-
-# 从 Apipost 递归抓取整个文档树（公开，无需登录）
-/knowledge-wiki ingest "https://docs.apipost.net/docs/detail/5347b5d25884000" --recursive
-
-# 从代码目录提取模块文档
-/knowledge-wiki ingest ./src/ --type code
-
-# 导入本地 PDF 技术方案
-/knowledge-wiki ingest ./docs/technical-spec.pdf
+/knowledge-wiki in source add <url> [--name <标签>]   # 注册外部知识源
+/knowledge-wiki in source list
+/knowledge-wiki in source remove <id>
 ```
 
-### 3. 注册持久化同步源
+### 查询
 
 ```bash
-/knowledge-wiki source add https://km.sankuai.com/collabpage/2760577321 \
-  --name "AI-DLC框架" --tags "ai,framework"
-
-/knowledge-wiki source list
-# ID       名称                  状态    上次同步
-# src-001  AI-DLC框架            active  2026-05-07
+/knowledge-wiki ask "<问题>"                 # 严格溯源回答
+/knowledge-wiki ask links <slug>             # 反向追溯：谁引用了这篇？
+/knowledge-wiki ask refs <slug>              # 正向追溯：这篇引用了谁？
 ```
 
-### 4. 开始使用
+### 维护
 
 ```bash
-# 日常问答
-/knowledge-wiki ask "API 网关的限流策略有哪些？"
-
-# 复杂推理（自动调用知识库 + MCP 工具 + 网络搜索）
-/knowledge-wiki reason "结合历史 ADR 和当前架构，分析限流误伤的根因并给出优化方案"
-
-# 查看知识图谱（浏览器双击打开）
-/knowledge-wiki graph
+/knowledge-wiki health                       # 综合健康报告
+/knowledge-wiki health rot                   # 过期 / 即将过期文档
+/knowledge-wiki health scan                  # 外部源变更检测
+/knowledge-wiki health coverage              # 知识覆盖率报告
+/knowledge-wiki health audit <slug>          # 确认有效 → 升级为 active
+/knowledge-wiki health deprecate <slug>      # 标记文档废弃
 ```
 
 ---
 
-## 📖 使用场景示例
+## 目录结构
 
-### 新人入职快速上手
-
-```bash
-/knowledge-wiki ask "麦芽田开放平台的渠道侧和配送侧接口有什么区别？"
-
-# 输出：
-# 渠道侧接口（/channel/）负责商家侧消息接收，主要参数包括 Tag 字段做路由...
-# 配送侧接口（/delivery/）负责配送状态推送，使用 Command 字段路由，鉴权方式不同...
-# 参考来源：[[api-gateway]] [[myt-adapter-architecture]]（相关度 ⭐⭐⭐⭐）
-# 置信度：high
-#
-# 💡 相关推荐：
-# 1. 渠道接入的完整流程是什么？
-# 2. send 和 receive 服务的日志格式有什么区别？
-```
-
-### 代码 Push 前自动提醒更新文档
-
-```bash
-$ git push origin feature/rate-limiter
-
-━━━ 知识库同步分析 (.knowledge/) ━━━
-📦 本次变更文件：
-  internal/gateway/rate_limiter.go
-  internal/gateway/config.go
-
-📝 建议更新以下知识库文档：
-  pages/entities/api-gateway.md  [已存在，需更新]
-
-检测到知识库有待处理事项，如何继续？
-  [1] 先同步知识源  [2] 先更新文档页面  [3] 两者都做  [4] 跳过直接推送
-```
-
-### 复杂多步推理
-
-```bash
-/knowledge-wiki reason \
-  "doudian 渠道在大促期间经常出现 5xx，结合现有架构和历史 ADR，给出排查思路"
-
-# Agent 自动执行：
-# Thought: 需要了解当前架构和历史决策
-# Action: kb_search("doudian 5xx 限流")
-# Observation: 找到 pages/entities/doudian-adapter.md、docs/implementation/rate-limiter-v2-adr.md
-# Thought: 查看具体接口实现
-# Action: kb_read("doudian-adapter")
-# ...
-# Final Answer: 排查思路：1. 确认是 send 还是 receive 侧 → 2. 检查 Tag 路由配置...
-```
-
-### 学城文档更新后自动感知
-
-```bash
-# push 时 hook 自动检测陈旧源：
-⏰ 发现未同步的知识源：
-  ⏰ [src-001] AI-DLC框架 (stale, 上次同步: 2026-04-30)
-  建议运行：/knowledge-wiki source sync
-
-# 手动触发增量同步：
-/knowledge-wiki source sync src-001
-
-# 同步报告：
-src-001  AI-DLC框架  ↑ 已更新（章节"三、各层说明"有变更）→ 重新导入了 1 页
-  ✓ pages/entities/ai-dlc-framework.md 已更新
-```
-
----
-
-## 🗂 目录结构
+`init` 后项目根目录会新增：
 
 ```
 .knowledge/
-├── CLAUDE.md              # AI 协作契约（Agent 每次必读）
-├── AGENTS.md              # AI 专用导航地图（≤100 行）
-├── dashboard.md           # 【CI 生成】知识库看板
-├── graph.html             # 【CI 生成】知识图谱可视化
-├── strategy/              # 团队黄金原则（低频，负责人维护）
-├── docs/                  # 项目文档（按生命周期分区）
-│   ├── requirements/      # 需求文档、PRD、UI 设计图
-│   ├── design/            # 技术方案、流程图、PUML
-│   ├── implementation/    # ADR、接口约定
-│   ├── quality/           # 测试方案、验收文档
-│   ├── release/           # 上线文档、回滚方案
-│   ├── exec-plans/        # 执行计划（active/completed）
-│   ├── domain/            # 业务领域知识
-│   └── generated/         # 【CI 生成】db-schema、api-changelog
-├── people/{user-id}/      # 个人上下文（AI 只读）
-├── playbooks/             # 锁定版任务契约（canonical，AI 禁止修改）
-├── pages/                 # Wiki 主页面（AI 自动生成）
-└── inbox/                 # 待处理草稿
+├── README.md               ← 双受众入口（顶部给 AI，底部给人类）
+├── CLAUDE.md               ← AI 协作契约 + 禁止行为
+├── AGENTS.md               ← AI 导航地图（≤50 行）
+├── .sources.yaml           ← 外部知识源注册表
+│
+├── glossary/               ← 术语词典 — 全局唯一定义锚点，优先写这里
+├── design/                 ← 架构 · 技术方案 · ADR（由 `type` 字段区分）
+├── requirements/           ← 需求文档、PRD、验收标准
+├── flows/                  ← 核心业务流程
+├── apis/                   ← 接口约定、字段映射
+├── data/                   ← 数据模型、DDL、存储文档
+├── ops/                    ← 运维手册、告警、大促保障
+├── incidents/              ← 故障复盘
+├── bizrules/               ← 业务规则（运营 + 技术共用）
+├── meetings/               ← 会议记录
+└── people/{user-id}/       ← 个人上下文（AI 只读）
 ```
+
+`design/` 通过 frontmatter `type` 字段区分三类文档：
+
+| `type` | 适用场景 |
+|--------|---------|
+| `architecture` | 系统架构现状（活文档，持续更新） |
+| `solution` | 某需求的技术方案（时间点快照） |
+| `adr` | 架构决策记录 — 记录"为什么这样选" |
+
+<details>
+<summary>完整目录规范与根文件模板 →</summary>
+
+完整目录树、目录职责速查、`README.md`、`CLAUDE.md`、`AGENTS.md` 和 `.sources.yaml` 的初始模板，见 [`references/directory-structure.md`](references/directory-structure.md)。
+
+</details>
 
 ---
 
-## 📋 全部命令
+## 模板库
 
-```
-/knowledge-wiki init [path]               # 初始化知识库（三阶段：创建→安装脚本→立即执行）
-/knowledge-wiki ingest <source>           # 导入文档（11+ 格式 + 学城/飞书/Apipost）
-/knowledge-wiki ask "<问题>"              # RAG 快速问答（BM25+Dense+GraphRAG+父子分块）
-/knowledge-wiki reason "<复杂问题>"       # ReACT 智能推理（自主编排工具和搜索）
-/knowledge-wiki wiki [--enable|--disable] # Wiki 模式开关 & 自动生成/更新页面
-/knowledge-wiki graph [path]              # 生成本地知识图谱 HTML（零依赖，双击即开）
-/knowledge-wiki search <query>            # 混合检索（不生成回答，看原始召回结果）
-/knowledge-wiki lint [path]               # 检查断链、孤立页面、frontmatter 缺失
-/knowledge-wiki eval [path]               # 端到端评测（召回率、BLEU-4、ROUGE-L、幻觉率）
-/knowledge-wiki export <format>           # 导出为 jsonl / qa-pairs / graphrag
-/knowledge-wiki status                    # 知识库健康状态一屏总览
-/knowledge-wiki sync [base_ref]           # push 前变更分析（pre-push 自动调用）
-/knowledge-wiki source add <url> [opts]   # 注册持久化同步源
-/knowledge-wiki source list               # 查看所有源（含状态和上次同步时间）
-/knowledge-wiki source sync [id]          # 增量同步（hash 对比，无变化自动跳过）
-/knowledge-wiki source remove <id>        # 移除源（不删除已生成页面）
-```
+> [!NOTE]
+> **v0.6.0 新增** — 12 个知识类型现在各有专属正文骨架，录入时强制执行。
 
----
+不再使用"TL;DR + 详情"的万能二段式，每个类型都有针对性的结构：
 
-## 📄 支持的文档格式
-
-**本地文件：** Markdown · PDF · Word (.docx) · TXT · 图片（OCR）· CSV/Excel · PPT (.pptx) · JSON · 代码目录 · 对话记录
-
-**在线平台：**
-
-| 平台 | 访问前提 | 特点 |
-|------|---------|------|
-| 飞书 `larkoffice.com` | 飞书已登录 | 目录树 + 正文分层提取 |
-| Apipost `docs.apipost.net` | 公开，无需登录 | 接口参数自动转 entity 页面 |
-| 普通网页 `https://...` | 公开页面 | 提取正文，去导航噪声 |
-
----
-
-## 🔬 检索架构
-
-`/knowledge-wiki ask` 采用四层混合检索：
-
-| 层级 | 方式 | 作用 |
+| 模板 | 层级 | 内容 |
 |------|------|------|
-| 1. BM25 | ripgrep 全文扫描 pages/ | 精确关键词匹配 |
-| 2. Dense | .kb-meta/chunks.jsonl top-K | 语义向量相似度 |
-| 3. GraphRAG | graph.json 1-hop 邻居 | 补充关联上下文 |
-| 4. 父子分块 | 子块命中→补充父块 | 防语义截断 |
+| `glossary.md` | L1 | 术语 · 同义词 · 技术字段映射 · 边界 |
+| `architecture.md` | L1 | 服务拓扑 · 模块职责 · 依赖关系 |
+| `adr.md` | L1 | 备选方案 · 取舍分析 · 决策后果 |
+| `requirement.md` | L1 | 用户故事 · 验收标准 |
+| `solution.md` | L2 | 背景目标 · 详细设计 · 影响面 |
+| `flow.md` | L2 | 触发条件 · 主流程 · 异常分支 |
+| `incident.md` | L2 | 时间线 · 5 Whys · 带负责人的改进措施 |
+| `bizrule.md` | L2 | 适用条件 · 计算公式 · 历史变更 |
+| `api.md` | L3 | 请求 · 响应 · 错误码 |
+| `data.md` | L3 | DDL · 字段 · 索引 |
+| `ops.md` | L3 | 超时 · 告警 · 限流 |
+| `meeting.md` | — | 讨论要点 · 结论 · Action Items |
 
-**融合排序规则：** backlink_count 高优先 → canonical 最高优先级 → deprecated 自动降权
+录入流程新增**两个关键节点**：
+
+- **Step 2.5 — 模板加载**：AI 推断出 type 后，读取 `_registry.yaml` 定位匹配骨架，写入前先按模板整理正文。
+- **Step 8.5 — 质量门禁**：逐项校验 `required_sections`，运行 `quality_gate` 检查，不达标时拦截并返回缺失清单。
+
+**示例质量门禁：**
+
+| 类型 | 门禁规则 |
+|------|---------|
+| `glossary` | 必须包含 ≥1 个技术字段名映射（后端 / 数据库 / 前端） |
+| `incident` | 每条改进措施须有负责人和截止日；根因不能停留在表面现象 |
+| `api` | 请求/响应字段必须标注类型；至少 1 个错误码 |
+| `bizrule` | 逻辑必须可被代码实现 — 需包含具体公式或判断分支 |
+
+<details>
+<summary>完整注册表与门禁规范 →</summary>
+
+所有 type 定义和门禁规则见 [`references/templates/_registry.yaml`](references/templates/_registry.yaml)。
+
+设计取舍与 GSD Artifact Taxonomy 的对比见 [`DESIGN.md`](./DESIGN.md) — 第九节「模板库机制」。
+
+</details>
 
 ---
 
-## 🧪 端到端评测
+## 文档格式
+
+每条知识条目使用 YAML frontmatter：
+
+```yaml
+---
+title: 打印服务超时机制
+type: ops
+tags: [print, timeout, fallback]
+owner: "@hanqiang"
+created: 2026-05-12
+expires: 2026-08-12        # 默认：创建后 90 天。填 "never" 表示永久有效。
+status: draft              # draft | active | deprecated | canonical
+sources:
+  - "手工录入 @hanqiang 2026-05-12"
+related:
+  - "[[print-service-overview]]"
+---
+```
+
+**status 生命周期：**
+
+```
+draft ──(health audit)──▶ active ──(health deprecate)──▶ deprecated
+                               ╲
+                                ──(手动晋升)──▶ canonical
+```
+
+| status | 含义 | AI 行为 |
+|--------|------|---------|
+| `draft` | 草稿，待确认 | 可参考，不作决策依据 |
+| `active` | 正式有效 | 正常检索引用 |
+| `deprecated` | 已废弃 | 禁止引用 |
+| `canonical` | 权威锁定 | 最高优先级；AI 禁止修改 |
+
+---
+
+## Git Hooks
+
+`/knowledge-wiki init` 自动安装两个 hook：
+
+### `pre-push` — 阻断式
+
+每次 `git push` 前运行，检查：
+
+- 知识文档是否在 **7 天内**到期或已过期
+- `.sources.yaml` 中的外部源是否超过 **30 天**未同步
+
+发现问题时提示：
+
+```
+[1] 现在处理   [2] 跳过   [3] 中止 push
+```
+
+> [!IMPORTANT]
+> Hook **无问题时完全静默** — 不会拖慢正常 push 流程。
+
+### `commit-msg` — 非阻断提示
+
+commit message 含 `[kb]` 标记时触发：
 
 ```bash
-/knowledge-wiki eval
-
-# 输出示例：
-# 检索层  召回命中率: 0.87  精确率: 0.79
-# 生成层  BLEU-4: 0.43  ROUGE-L: 0.61  幻觉率: 4.8%
-# 全链路  P50: 1.2s  P95: 2.8s
+git commit -m "fix: 修复打印超时未重置问题 [kb]"
+# → 提示：知识库中有 ops/print-timeout.md，建议更新
 ```
 
----
-
-## 🏗 方法论来源
-
-knowledge-wiki 融合以下领域最佳实践：
-
-- **AI-DLC 框架**（内部）— 目录分层、AGENTS.md 规范、CI 门禁、generated/ 隔离
-- **Zettelkasten** — 原子化笔记 + 显式链接网络
-- **GraphRAG（Microsoft）** — 社区检测 + 图谱摘要 + 层级检索
-- **ReACT 框架** — Thought-Action-Observation 渐进式推理循环
-- **Obsidian WikiLink** — 双向链接和 backlink 追踪
-- **RAG 最佳实践** — 语义分块 + 父子分块 + BM25/Dense 混合
-
-详见 [`references/methodology.md`](./references/methodology.md)。
+不阻断 commit，仅输出建议。
 
 ---
 
-## 📐 工程结构（渐进式披露）
+## 外部源管理
 
-`SKILL.md` 作为导航入口只保留核心命令和摘要，细节在按需读取的 `references/` 中：
+在 `.knowledge/.sources.yaml` 注册需要持续追踪的外部文档：
 
-| 文件 | 内容 | 何时读取 |
-|------|------|---------|
-| `references/kb-structure.md` | 知识库目录结构详解 | init / 调整目录时 |
-| `references/doc-standards.md` | frontmatter / WikiLink / 分块规则 | ingest / wiki 写页前 |
-| `references/retrieval-config.md` | 检索参数详解（threshold/top_k/mode 等） | 调优召回质量时 |
-| `references/agents-claude-spec.md` | AGENTS.md / CLAUDE.md 模板规范 | init 生成治理文件时 |
-| `references/methodology.md` | 6 大方法论来源详解 | 深入理解设计哲学时 |
-| `references/ingest-pipeline.md` | Agent 处理流程 + 异常处理 + 代码提取 | ingest 执行时 |
-| `references/output-templates.md` | 各命令输出格式示例 | 需要示例时 |
-| `references/data-schemas.md` | graph.json / sources.json / eval 数据集结构 | 读写元数据时 |
-| `references/lint-rules.md` | lint 规则的自动修复建议 | lint 报错时 |
-| `references/scripts/` | 5 个脚本模板（init 写入项目） | init 阶段读取 |
+```yaml
+sources:
+  - id: print-api-doc
+    name: 打印接口文档
+    url: https://docs.apipost.net/docs/detail/xxx
+    tracked_by: "@hanqiang"
+    last_hash: ""
+    last_synced: ""
+    status: active          # active | stale | error
+    related_docs:
+      - apis/print-api.md
+```
+
+`/knowledge-wiki health scan` 拉取每个注册 URL，计算内容 hash，发现变更后提示处理 — **不自动覆盖**本地文档。
 
 ---
 
-## 📜 许可证
+## 工具依赖
 
-内部工具 — Anthony
+`/knowledge-wiki init` 在创建任何文件前自动检查依赖。
 
+### Group A — 必需工具
+
+| 工具 | 必需性 | 用途 |
+|------|:------:|------|
+| `rg`（ripgrep） | ✅ | 全文检索与反向追溯 |
+| `git` | ✅ | Hook 安装 |
+| `jq` | 可选 | Hook 脚本解析 frontmatter |
+
+### Group B — 浏览器自动化（处理 URL 录入）
+
+> [!NOTE]
+> 全部可选。该组中任一工具已安装即可处理 URL 录入。
+
+| 工具 | 适用场景 |
+|------|---------|
+| `agent-browser` | 通用 AI 原生首选（轻量、50+ 命令） |
+| `browser-harness` | 选择器易变 / 动态渲染页面 |
+| `playwright` | 流程固定的批量录入 / 扫描 |
+| `browser-use` | 多步骤 LLM 自主决策 |
+| `page-agent` | 中文网页站点 |
+
+```bash
+bash references/scripts/check-deps.sh                    # 仅检查
+bash references/scripts/check-deps.sh --install          # 安装缺失的 Group A 工具
+bash references/scripts/check-deps.sh --install-browser  # 安装全部 Group B 工具
+```
+
+自动选择当前系统的包管理器：`brew` · `apt` · `yum` · `npm` · `pipx`。
+
+---
+
+## 设计原则
+
+1. **无来源不写、不答** — `sources` 必填；`ask` 无记录时明确告知，不猜测。
+2. **术语唯一定义** — 定义锚点在 `glossary/`；所有文档通过 `[[slug]]` 引用，不重复定义。
+3. **草稿优先** — 新条目默认 `status: draft`；由 `health audit` 人工晋升。
+4. **rg 零索引追溯** — 正反向追溯直接扫描 Markdown，无需维护 JSON 索引文件。
+5. **静默放行** — Hook 和 `health rot` 无问题时完全不输出，不干扰正常工作流。
+6. **deprecate 必处理引用** — 废弃前用 `rg` 找出所有引用处，防止悬空链接。
+7. **工具检查门** — `init` 缺必需工具时中止，不留部分初始化状态。
+8. **模板即合约** *(v0.6.0)* — 录入正文严格按 `templates/{type}.md` 骨架生成；AI 不允许自行增删一级标题；Step 8.5 门禁强制校验必填段。
+
+---
+
+## 使用示例
+
+<details>
+<summary>录入示例</summary>
+
+```bash
+# 从飞书文档录入
+/knowledge-wiki in https://xxx.feishu.cn/docx/xxx
+
+# 从飞书知识库录入
+/knowledge-wiki in https://xxx.feishu.cn/wiki/xxx
+
+# 手工录入一条知识
+/knowledge-wiki in "打印服务超时是 30s，超时后 fallback 到本地缓存"
+
+# 从代码文件提炼设计知识
+/knowledge-wiki in ./src/print/service.go
+
+# 注册外部知识源（持续追踪变更）
+/knowledge-wiki in source add https://docs.apipost.net/docs/detail/xxx --name "打印接口文档"
+```
+
+</details>
+
+<details>
+<summary>查询与追溯示例</summary>
+
+```bash
+# 提问 — 回答总会引用来源文档
+/knowledge-wiki ask "打印服务的超时配置是多少？"
+
+# 谁引用了这篇文档？
+/knowledge-wiki ask links print-timeout
+
+# 这篇文档引用了哪些？
+/knowledge-wiki ask refs print-timeout
+```
+
+</details>
+
+<details>
+<summary>维护示例</summary>
+
+```bash
+# 检查外部源是否有更新
+/knowledge-wiki health scan
+
+# 查看过期或即将过期的文档
+/knowledge-wiki health rot
+
+# 确认文档仍有效（重置过期时间 +90 天）
+/knowledge-wiki health audit print-timeout
+
+# 废弃过期文档（先处理所有引用）
+/knowledge-wiki health deprecate old-print-config
+```
+
+</details>
+
+---
+
+## 资源索引
+
+| 文件 | 用途 |
+|------|------|
+| [`SKILL.md`](./SKILL.md) | Skill 主入口 — 工具表、子命令骨架、AI 调用规则 |
+| [`DESIGN.md`](./DESIGN.md) | 架构取舍、分层模型、模板库设计原理 |
+| [`references/directory-structure.md`](references/directory-structure.md) | `.knowledge/` 目录树 + 根文件模板 |
+| [`references/ingestion-rules.md`](references/ingestion-rules.md) | 11 步录入流程、slug 规则、质量门禁 |
+| [`references/ask-rules.md`](references/ask-rules.md) | 两层检索、回答格式、时效计算、links/refs |
+| [`references/health-rules.md`](references/health-rules.md) | rot · scan · coverage · audit · deprecate 规范 |
+| [`references/url-handling.md`](references/url-handling.md) | URL 路由规则、飞书子流程、scan 路由 |
+| [`references/templates/_registry.yaml`](references/templates/_registry.yaml) | 中央类型注册表 → 模板 + 必填段 + 门禁 |
+| [`references/scripts/check-deps.sh`](references/scripts/check-deps.sh) | 依赖检查 + 一键安装 |
+
+---
+
+## 更新日志
+
+完整版本历史见 [`CHANGELOG.md`](./CHANGELOG.md)。
+
+---
+
+<div align="center">
+
+为希望让知识保持活力、而不只是归档的团队而生。
+
+</div>

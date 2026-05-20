@@ -1,17 +1,18 @@
 [
   {
-    "id": "tp-01",
-    "prompt": "/knowledge-wiki init",
-    "expected": "Agent 能按 SKILL.md 的三阶段流程（创建结构→安装脚本→首次执行）完整初始化知识库，输出清晰的完成摘要，包含目录树、脚本清单、hook 状态、健康报告"
+    "id": "p1-happy-in",
+    "prompt": "帮我把打印服务超时阈值是30s，超了会fallback到本地缓存这条知识录入知识库",
+    "expected": "应触发 /knowledge-wiki in 子命令，判断为文本输入，推断 type=ops，生成 slug，写入 .knowledge/ops/ 下对应 .md 文件，包含完整 frontmatter（title/tags/status:draft/sources/expires），输出录入确认信息"
   },
   {
-    "id": "tp-02",
-    "prompt": "/knowledge-wiki ingest https://km.sankuai.com/collabpage/2760577321",
-    "expected": "Agent 识别为学城平台 URL，使用正确的提取策略（heading/cell/textbox 全量提取），处理登录态检测，生成草稿写入 inbox/，更新 graph.json 和 index.md"
+    "id": "p2-happy-ask",
+    "prompt": "知识库里查一下打印服务的超时配置是多少",
+    "expected": "应触发 /knowledge-wiki ask 子命令，先用 rg 搜索关键词，读取命中文件 frontmatter+TL;DR，输出带来源溯源的标准回答格式（回答+来源路径+录入人+时效状态），无记录时明确报告不猜测"
   },
   {
-    "id": "tp-03",
-    "prompt": "/knowledge-wiki ask \"API 网关的限流策略有哪些？\"",
-    "expected": "Agent 执行四层混合检索（BM25+Dense+GraphRAG+父子分块），给出带来源标注的回答，包含置信度和推荐问题，输出格式符合 SKILL.md 规定的模板"
+    "id": "p3-ambiguous-url",
+    "prompt": "把这个文档录入知识库：https://xxx.feishu.cn/docx/12345",
+    "expected": "应触发 /knowledge-wiki in 的 URL 处理分支，识别 feishu.cn 域名使用 agent-browser 提取正文，登录检测，推断 type，结构化写入，输出确认信息。若登录检测到需登录页面则中止并提示"
   }
 ]
+

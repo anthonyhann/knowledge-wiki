@@ -11,7 +11,7 @@
 
 Turns scattered content from Feishu, Apipost, code, and meetings into a structured, searchable, strictly-sourced local knowledge base — integrated directly into your Claude Code workflow.
 
-[Quick Start](#quick-start) · [Commands](#commands) · [Templates](#template-library) · [Design](#design-principles) · [Changelog](./CHANGELOG.md)
+[Quick Start](#quick-start) · [Commands](#commands) · [Templates](#template-library) · [Design](#design-principles) · [Changelog](./CHANGELOG.md) · [中文](./README_zh.md)
 
 </div>
 

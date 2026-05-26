@@ -19,7 +19,7 @@ created: {YYYY-MM-DD}
 expires: {YYYY-MM-DD}                          # 默认 90 天
 status: draft
 sources:
-  - "{ApiPost / 飞书文档 / 代码路径}"
+  - "{ApiPost / 飞书 / 代码路径}"
 related:
   - "[[{关联术语 slug}]]"
   - "[[{关联流程 slug}]]"

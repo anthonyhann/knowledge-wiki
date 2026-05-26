@@ -8,7 +8,7 @@
 填写指南：
 - 优先用户故事格式（As a / I want / So that）描述需求
 - 验收标准用 Given/When/Then 或可测试断言形式
-- 来源若是飞书文档 PRD，sources 必须填入原始 URL
+- 来源若是飞书 PRD，sources 必须填入原始 URL
 -->
 ---
 title: {需求名称}                              # 例：配送发单支持多商家拆单
@@ -19,7 +19,7 @@ created: {YYYY-MM-DD}
 expires: {YYYY-MM-DD}                          # 默认 90 天，需求关闭后可改 deprecated
 status: draft
 sources:
-  - "{飞书文档 PRD URL 或来源}"
+  - "{飞书 PRD URL 或来源}"
 related:
   - "[[{关联术语 slug}]]"
   - "[[{关联流程 slug}]]"

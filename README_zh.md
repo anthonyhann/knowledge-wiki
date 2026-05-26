@@ -1,31 +1,348 @@
+# knowledge-wiki
+
 <div align="center">
 
-# 📚 knowledge-wiki
+**知识编译器** —— 将散落、腐烂、难以写入的知识，沉淀为结构化、可检索、严格溯源的本地知识库。
 
-**团队知识全生命周期管理 — 零门槛录入、严格溯源、持续维护。**
+[![版本](https://img.shields.io/badge/版本-v1.1.0-blue.svg)](./CHANGELOG.md)
+[![协议](https://img.shields.io/badge/协议-MIT-green.svg)](./LICENSE)
+[![Lang](https://img.shields.io/badge/lang-English-blue.svg)](./README.md)
 
-[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](./CHANGELOG.md)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Claude Skill](https://img.shields.io/badge/claude-skill-orange.svg)](./SKILL.md)
-[![Requires](https://img.shields.io/badge/requires-ripgrep%20%7C%20git-lightgrey.svg)](#工具依赖)
-
-将飞书、Apipost、代码、会议中散落的内容沉淀为结构化、可检索、严格溯源的本地知识库 — 直接集成在 Claude Code 工作流中。
-
-[快速开始](#快速开始) · [命令](#命令) · [模板库](#模板库) · [设计原则](#设计原则) · [更新日志](./CHANGELOG.md) · [English](./README.md)
+[English](./README.md) · [设计文档](./DESIGN.md) · [更新日志](./CHANGELOG.md) · [TODO](./TODO.md)
 
 </div>
 
 ---
 
-## 为什么用 knowledge-wiki？
+## 为什么需要 knowledge-wiki？
 
-大多数团队都面临同样的三个问题：
+AI 辅助开发存在根本性的认知缺口：代码库被文档化为**扁平文本块**，检索系统只优化语义相似度，无法区分「决策意图」与「执行事实」。
 
-| 问题 | 现状 | 解决方式 |
-|------|------|---------|
-| **知识散落** | 文档分散在飞书、Notion、群聊和脑子里 | 统一 `.knowledge/` 目录，一条命令录入 |
-| **知识腐烂** | 过期文档悄悄误导决策 | 90 天有效期 + push 前 git hook 自动警告 |
-| **录入门槛高** | 模板复杂，没人愿意写文档 | 类型自动推断 + AI 结构化，直接粘贴即可 |
+AI 代理无法回答三个核心问题：
+
+- **谁负责？**（决策路由）—— 这个需求应该由哪个服务处理？
+- **怎么做？**（执行编排）—— 标准流程是什么？出错了怎么办？
+- **用什么工具？**（原子调用）—— 接口长什么样？SLA 是多少？
+
+> **核心结论**：瓶颈不是检索精度，而是**认知保真度** —— 能否分层表示知识、标注健康状态、验证跨层引用完整性，并显式建模「组织不知道自己不知道的事」。
+
+---
+
+## 目录
+
+- [架构总览](#架构总览)
+- [核心理念](#核心理念)
+- [L1 / L2 / L3 三层认知架构](#l1--l2--l3-三层认知架构)
+- [子命令速查](#子命令速查)
+- [工具依赖](#工具依赖)
+- [按域名路由浏览器自动化](#按域名路由浏览器自动化)
+- [模板库](#模板库)
+- [文档生命周期](#文档生命周期)
+- [Frontmatter 格式](#frontmatter-格式)
+- [Git Hooks](#git-hooks)
+- [使用示例](#使用示例)
+- [设计原则](#设计原则)
+- [快速开始](#快速开始)
+- [资源索引](#资源索引)
+
+---
+
+## 架构总览
+
+```
+                ┌──────────────────────┐
+用户输入 ──────►│   in（14 步）         │
+                └──┬───────────────────┘
+                   ├── .knowledge/{dir}/{slug}.md     （写入）
+                   ├── .index/{type}.idx.md           （Step 9.5 索引更新）
+                   ├── .pending-backlinks.yaml        （Step 9.6 反向引用入队）
+                   └── .logs/personal/{id}.md         （Step 10 日志）
+
+                ┌──────────────────────┐
+用户提问 ──────►│   ask（3 层）         │
+                └──┬───────────────────┘
+                   ├── Layer -1 : Index 预筛选
+                   ├── Layer  0 : rg 关键词匹配
+                   ├── Layer 0.5: frontmatter 兜底
+                   ├── Layer  1 : 语义筛选 → 回答
+                   └── .logs/personal/{id}.md         （日志）
+
+                ┌─────────────────────────────────────┐
+                │              health                  │
+                ├─────────────────────────────────────┤
+                │ rot / scan / coverage（增强）         │
+                │ lint（L1–L9 一致性检查）              │
+                │ backlink-consume（消费队列）           │
+                │ index-rebuild（重建索引）              │
+                │ distill（认知蒸馏）                   │  ← v1.1.0
+                │ audit / deprecate                    │
+                │ └→ .logs/personal/{id}.md + digest   │
+                └─────────────────────────────────────┘
+```
+
+---
+
+## 核心理念
+
+> 从「知识存储」升级为「**知识编译**」—— 每次操作不仅存储知识，还让整个知识网络变得更密、更准、更有价值。
+
+| 编译能力 | 说明 | 类比 |
+|---|---|---|
+| **分段索引** | 按 type 分 9 个 idx 文件，ask 时先读 index 预筛再 rg 精确搜索 | 从「每次从头搜索」→「先看目录再定位」 |
+| **操作日志** | 按人分文件记录所有操作，hash 脱敏保护隐私，跨 session 可恢复上下文 | 从「无历史」→「知道最近做了什么」 |
+| **双向引用** | 录入时反向入队，health 时批量回写 related，避免引用单向老化 | 从「只有新文档知道旧文档」→「旧文档也知道被引用了」 |
+| **一致性检查** | 集中式 L1–L9 检测（矛盾/悬空引用/状态不一致），只在 health 时运行，不阻断主流程 | 从「有问题不知道」→「定期健康扫描自动发现」 |
+| **Ask 回流** | 综合分析结果可录入为 `synthesis` 文档，避免高质量答案消失在聊天中 | 从「问答即弃」→「有价值发现可沉淀」 |
+| **三层防护** `v0.9.0` | Index 准确性由 AI 实时写入 + health rebuild 最终一致 + pre-commit hook 拦截三层保证 | 从「写了就靠天」→「写→修→拦 全覆盖」 |
+| **认知蒸馏** `v1.1.0` | Jaccard 相似度去重 + 低质量草稿清理 + 孤立知识检测，主动识别冗余 | 从「被动管理」→「主动进化」 |
+
+---
+
+## L1 / L2 / L3 三层认知架构
+
+| 层级 | 别名 | 认知角色 | 核心问题 | 知识对象 |
+|---|---|---|---|---|
+| **L1 领域层** | 骨架 | 决策 | 谁负责？能做/不能做什么？ | 边界·意图·状态机·协作拓扑 |
+| **L2 执行层** | 分子 | SOP 编排 | 怎么做？什么顺序？出错怎么办？ | 触发绑定·执行 DAG·分支条件·人工节点 |
+| **L3 能力层** | 原子 | 工具调用 | 用什么工具？接口规格？SLA？ | 入参·出参结构·协议坐标·运行时约束 |
+
+| 目录 | Type | 层级 |
+|---|---|---|
+| `glossary/` | glossary | L1 —— 核心实体定义，术语锚点 |
+| `design/` | architecture / adr | L1 —— 系统架构、ADR |
+| `requirements/` | requirement | L1 —— PRD、功能规格、验收标准 |
+| `flows/` | flow | L2 —— 业务流程 SOP、业务规则 |
+| `case/` | case | L2 —— 反向示例、故障复盘 |
+| `design/` | solution | L2 —— 技术方案快照 |
+| `synthesis/` | synthesis | L2 —— Ask 回流综合分析文档 |
+| `apis/` | api | L3 —— 接口约定、字段映射 |
+| `db/` | db | L3 —— 数据模型、存储设计 |
+| `ops/` | ops | L3 —— 运维手册、告警阈值 |
+
+> 完整目录树、type 映射、L1/L2/L3 定义统一维护在 [`references/directory-structure.md`](./references/directory-structure.md)（单一权威源）。设计哲学见 [`DESIGN.md`](./DESIGN.md)。
+
+---
+
+## 子命令速查
+
+```bash
+# 初始化（含工具依赖检查 + 安装 4 个 git hooks）
+/knowledge-wiki init
+
+# 录入
+/knowledge-wiki in <文字/URL/文件路径>
+/knowledge-wiki in --update <slug>
+/knowledge-wiki in source add <url> [--name <名称>]
+/knowledge-wiki in source list
+/knowledge-wiki in source remove <id>
+/knowledge-wiki in --from-answer "<简短描述>"   # Ask 回流
+
+# 查询
+/knowledge-wiki ask "<问题>"
+/knowledge-wiki ask links <slug>        # 反向追溯：谁引用了这篇
+/knowledge-wiki ask refs  <slug>        # 正向追溯：这篇引用了谁
+
+# 维护
+/knowledge-wiki health                  # 综合报告
+/knowledge-wiki health --json           # JSON 格式输出          [v0.9.0]
+/knowledge-wiki health --verbose        # 含 ASCII 图表的详细模式 [v0.9.0]
+/knowledge-wiki health rot              # 扫描过期/即将过期文档
+/knowledge-wiki health scan             # 检测外部知识源变更
+/knowledge-wiki health coverage         # 覆盖率 + 问答缺口分析
+/knowledge-wiki health audit <slug>     # 确认文档有效，升级为 active
+/knowledge-wiki health deprecate <slug> # 标记文档废弃
+/knowledge-wiki health lint             # 一致性检查 L1–L9
+/knowledge-wiki health lint --fix       # 安全自动修复（L3+L8）
+/knowledge-wiki health backlink-consume # 消费反向引用队列
+/knowledge-wiki health index-rebuild    # 全量重建分段索引
+/knowledge-wiki health distill          # 认知蒸馏预览            [v1.1.0]
+/knowledge-wiki health distill --execute # 执行蒸馏（需用户逐步确认）
+```
+
+---
+
+## 工具依赖
+
+`/knowledge-wiki init` 在创建目录前先调用 `references/scripts/check-deps.sh`。
+
+### Group A —— 核心工具（必须）
+
+| 工具 | 必需性 | 用途 |
+|---|---|---|
+| `rg`（ripgrep） | **REQUIRED** | 关键词检索/追溯 |
+| `git` | **REQUIRED** | hook 安装与触发 |
+| `jq` | OPTIONAL | hook 脚本解析 frontmatter |
+
+### Group B —— 浏览器自动化（任选其一）
+
+| 工具 | 定位 | 适用场景 |
+|---|---|---|
+| `agent-browser` | AI 工具调用的极速瑞士军刀 | AI 调用首选；通用首选 |
+| `browser-harness` | AI 编程助手的自愈浏览器手 | 选择器易变 / 动态渲染页面 |
+| `playwright` | 工程化测试的坚实基石 | 流程固定的批量录入/扫描 |
+| `browser-use` | LLM 自主操作的完整大脑 | 多步骤 LLM 自主决策 |
+| `page-agent` | 中文网页理解的领域专家 | 中文/阿里系站点 |
+
+> Group B 全部 OPTIONAL；任一已装即可处理内部文档 URL。
+
+### 一键安装
+
+```bash
+bash references/scripts/check-deps.sh                   # 仅检查
+bash references/scripts/check-deps.sh --install         # 安装缺失的必需工具（Group A）
+bash references/scripts/check-deps.sh --install-browser # 安装缺失的浏览器工具（Group B）
+```
+
+脚本自动按当前 OS（macOS → brew / Linux → apt|yum / npm / pipx）选择安装命令。
+
+---
+
+## 按域名路由浏览器自动化
+
+涉及内部文档 URL（飞书、Apipost 等）时，按域名路由到浏览器自动化工具。未装时强制提示安装。
+
+```
+URL 域名                              工具
+──────────────────────────────────────────────────────────
+feishu.cn / larkoffice.com      →   agent-browser / browser-harness / …
+apipost.net                     →   agent-browser（遍历目录树）
+其他公网 URL                     →   任一 Group B 工具
+```
+
+完整工具选型矩阵见 [`references/url-handling.md`](./references/url-handling.md)。
+
+---
+
+## 模板库
+
+为 **9 个 type** 各提供专属正文骨架（v0.8.0 新增 `synthesis`）：
+
+```
+references/templates/
+├── _registry.yaml      ← 中央注册表（type → 模板 + 必填段 + 质量门禁）
+├── glossary.md         ← L1  术语定义
+├── architecture.md     ← L1  架构现状
+├── adr.md              ← L1  架构决策记录
+├── requirement.md      ← L1  需求文档 / PRD
+├── flow.md             ← L2  业务流程 SOP
+├── solution.md         ← L2  技术方案
+├── case.md             ← L2  反向示例 / 故障复盘
+├── synthesis.md        ← L2  综合分析（Ask 回流）  [v0.8.0]
+├── api.md              ← L3  接口约定
+├── db.md               ← L3  数据模型
+└── ops.md              ← L3  运维手册
+```
+
+**关键流程节点**（共 15 步）：
+
+| 步骤 | 名称 | 说明 |
+|---|---|---|
+| 2.5 | 模板加载 | 读 `_registry.yaml` 定位到 `templates/{type}.md`，按骨架整理正文 |
+| 2.65 | 相似检测 `v1.1.0` | Jaccard 快速匹配（>0.70 提示走 `--update`）。不阻断 |
+| 8.5 | 质量门禁 | 写入前逐项检查 `required_sections` 并运行 `quality_gate` 文本校验 |
+| 9.5 | 索引更新 | 写入成功后立即更新 `.index/` 对应 idx 文件（失败仅 WARNING） |
+| 9.6 | 反向引用入队 | `related ≥ 1` 且目标非 deprecated 且队列 < 15 时，写入 `.pending-backlinks.yaml` |
+| 10 | 操作日志 | 所有操作留痕到 `.logs/personal/{mis-id}.md` |
+
+---
+
+## 文档生命周期
+
+| status | 含义 | AI 行为 |
+|---|---|---|
+| `draft` | 草稿，待确认 | 可参考，不作决策依据 |
+| `active` | 正式有效 | 正常检索引用 |
+| `deprecated` | 已废弃 | **禁止**引用 |
+| `canonical` | 权威锁定 | 最高优先级，AI 禁止修改 |
+
+检索优先级：`canonical > active > draft`（deprecated 被排除）
+
+---
+
+## Frontmatter 格式
+
+```yaml
+---
+title: 打印服务超时机制
+type: ops
+tags: [print, timeout, fallback]
+owner: "@hanqiang"
+created: 2026-05-12
+expires: 2026-08-12        # 默认 90 天；填 never 表示长期有效
+status: draft              # draft | active | deprecated | canonical
+sources:
+  - "手工录入 @hanqiang 2026-05-12"
+related:
+  - "[[print-service-overview]]"
+---
+```
+
+---
+
+## Git Hooks
+
+`/knowledge-wiki init` 安装 **4 个** git hooks：
+
+| Hook | 触发时机 | 行为 |
+|---|---|---|
+| `pre-commit` `v0.9.0` | staged `.knowledge/` 文件 | 检查 L2 悬空引用 + L5 孤儿索引。ERROR 阻断；WARNING 不阻断 |
+| `post-merge` `v0.9.0` | merge 后 | 变更 >3 篇或 rebuild >30 天 → 提示 `health index-rebuild`。不自动执行 |
+| `pre-push` | push 前 | 检测即将过期（≤7 天）或已过期文档 + 外部源未同步（>30 天）。提示 `[1] 现在处理  [2] 跳过  [3] 中止` |
+| `commit-msg` | 含 `[kb]` 标记的 commit | 检查知识库是否有相关文档，建议更新或新建。不阻断 |
+
+---
+
+## 使用示例
+
+```bash
+# 从飞书文档录入（走浏览器自动化工具）
+/knowledge-wiki in https://xxx.feishu.cn/docx/xxx
+
+# 手工录入一条知识
+/knowledge-wiki in "打印服务超时阈值是 30s，超了会 fallback 到本地缓存"
+
+# 从代码文件提炼设计知识
+/knowledge-wiki in ./src/print/service.go
+
+# 查询知识库
+/knowledge-wiki ask "打印服务的超时配置是多少？"
+
+# 反向追溯：谁引用了 print-timeout 这篇文档
+/knowledge-wiki ask links print-timeout
+
+# 注册外部知识源（持续追踪变更）
+/knowledge-wiki in source add https://docs.apipost.net/docs/detail/xxx --name 打印接口文档
+
+# 检查外部源是否有更新
+/knowledge-wiki health scan
+
+# 查看过期文档
+/knowledge-wiki health rot
+
+# 人工确认某篇文档仍有效（重置过期时间 +90 天）
+/knowledge-wiki health audit print-timeout
+```
+
+---
+
+## 设计原则
+
+1. **无来源不写、不答** —— `sources` 必填；ask 无知识库记录时明确告知，不猜测
+2. **术语唯一** —— 术语定义锚点在 `glossary/`，其他文档用 `[[slug]]` 引用，不重复定义
+3. **草稿优先** —— 新录入一律 `status: draft`，由 `health audit` 人工升级
+4. **静默放行** —— hook 和 rot 扫描无问题时完全不输出，不干扰正常工作流
+5. **deprecate 必处理引用** —— 废弃前用 `rg` 找出所有引用处，防止悬空链接
+6. **索引辅助检索** `v0.8.0` —— `.index/` 分段索引作为 Layer -1 预筛选层
+7. **操作留痕** `v0.8.0` —— 所有操作均写入日志；ask 内容 hash 脱敏保护隐私
+8. **延迟回写** `v0.8.0` —— 反向引用写入队列，由 health 批量安全消费
+9. **集中式 lint** `v0.8.0` —— 矛盾检测只在 `health lint` 时执行，不阻断 in/ask 流程
+10. **按域名路由浏览器自动化** —— 内部文档 URL 按域名路由到浏览器工具，未装时强制提示
+11. **工具检查门** —— `init` Step 0 必跑 `check-deps.sh`，缺必需工具中止 init
+12. **模板为合约** —— 录入正文严格按 `references/templates/{type}.md` 骨架生成
+13. **二次回流禁止** `v0.8.0` —— `synthesis` 文档不能再通过 ask 回流生成新 synthesis（防止套娃）
+14. **三层数据防护** `v0.9.0` —— AI 实时写入 + health rebuild + pre-commit hook 拦截三层保证
+15. **认知蒸馏** `v1.1.0` —— `health distill` 扫描重复/低质量/孤立知识，默认预览不修改
+16. **录入前防重** `v1.1.0` —— Step 2.65 Jaccard 快速匹配（>0.70 提示），降低知识重复率
 
 ---
 
@@ -35,387 +352,55 @@
 # 1. 进入项目根目录
 cd ~/your-project
 
-# 2. 初始化（检查工具、创建 .knowledge/、安装 git hooks）
+# 2. 初始化（自动检查工具依赖）
 /knowledge-wiki init
+# 缺必需工具时三选一：[1] 一键安装  [2] 手动安装后重试  [3] 中止
+# 通过后创建 .knowledge/ 目录 + 安装 git hooks
 
 # 3. 录入第一条知识
-/knowledge-wiki in "打印服务超时阈值是 30s，超时后 fallback 到本地缓存"
+/knowledge-wiki in "打印服务超时阈值 30s"
 
-# 4. 查询
+# 4. 查询验证
 /knowledge-wiki ask "打印服务超时"
 
-# 5. 随时做健康检查
+# 5. 定期维护
 /knowledge-wiki health
 ```
-
-> [!TIP]
-> `/knowledge-wiki init` 会自动检测缺失工具并提供一键安装。详见[工具依赖](#工具依赖)。
-
----
-
-## 命令
-
-### 概览
-
-| 命令 | 功能 |
-|------|------|
-| [`init`](#init) | 检查工具 · 创建 `.knowledge/` · 安装 git hooks |
-| [`in`](#录入) | 零门槛录入文字、URL、文件或代码 |
-| [`ask`](#查询) | 严格溯源问答 — 无记录不猜测 |
-| [`health`](#维护) | 腐烂检测 · 外部源扫描 · 覆盖率报告 |
-
-### `init`
-
-```bash
-/knowledge-wiki init
-```
-
-运行 `check-deps.sh`，创建目录结构，并安装两个 git hooks。如缺少必需工具（`rg`、`git`），提供三选一：自动安装 / 手动安装后重试 / 中止。
-
-### 录入
-
-```bash
-/knowledge-wiki in <文字|URL|文件路径>       # 智能录入，支持任意来源
-/knowledge-wiki in --update <slug>           # 更新已有条目
-
-/knowledge-wiki in source add <url> [--name <标签>]   # 注册外部知识源
-/knowledge-wiki in source list
-/knowledge-wiki in source remove <id>
-```
-
-### 查询
-
-```bash
-/knowledge-wiki ask "<问题>"                 # 严格溯源回答
-/knowledge-wiki ask links <slug>             # 反向追溯：谁引用了这篇？
-/knowledge-wiki ask refs <slug>              # 正向追溯：这篇引用了谁？
-```
-
-### 维护
-
-```bash
-/knowledge-wiki health                       # 综合健康报告
-/knowledge-wiki health rot                   # 过期 / 即将过期文档
-/knowledge-wiki health scan                  # 外部源变更检测
-/knowledge-wiki health coverage              # 知识覆盖率报告
-/knowledge-wiki health audit <slug>          # 确认有效 → 升级为 active
-/knowledge-wiki health deprecate <slug>      # 标记文档废弃
-```
-
----
-
-## 目录结构
-
-`init` 后项目根目录会新增：
-
-```
-.knowledge/
-├── README.md               ← 双受众入口（顶部给 AI，底部给人类）
-├── CLAUDE.md               ← AI 协作契约 + 禁止行为
-├── AGENTS.md               ← AI 导航地图（≤50 行）
-├── .sources.yaml           ← 外部知识源注册表
-│
-├── glossary/               ← 术语词典 — 全局唯一定义锚点，优先写这里
-├── design/                 ← 架构 · 技术方案 · ADR（由 `type` 字段区分）
-├── requirements/           ← 需求文档、PRD、验收标准
-├── flows/                  ← 核心业务流程
-├── apis/                   ← 接口约定、字段映射
-├── data/                   ← 数据模型、DDL、存储文档
-├── ops/                    ← 运维手册、告警、大促保障
-├── incidents/              ← 故障复盘
-├── bizrules/               ← 业务规则（运营 + 技术共用）
-├── meetings/               ← 会议记录
-└── people/{user-id}/       ← 个人上下文（AI 只读）
-```
-
-`design/` 通过 frontmatter `type` 字段区分三类文档：
-
-| `type` | 适用场景 |
-|--------|---------|
-| `architecture` | 系统架构现状（活文档，持续更新） |
-| `solution` | 某需求的技术方案（时间点快照） |
-| `adr` | 架构决策记录 — 记录"为什么这样选" |
-
-<details>
-<summary>完整目录规范与根文件模板 →</summary>
-
-完整目录树、目录职责速查、`README.md`、`CLAUDE.md`、`AGENTS.md` 和 `.sources.yaml` 的初始模板，见 [`references/directory-structure.md`](references/directory-structure.md)。
-
-</details>
-
----
-
-## 模板库
-
-> [!NOTE]
-> **v0.6.0 新增** — 12 个知识类型现在各有专属正文骨架，录入时强制执行。
-
-不再使用"TL;DR + 详情"的万能二段式，每个类型都有针对性的结构：
-
-| 模板 | 层级 | 内容 |
-|------|------|------|
-| `glossary.md` | L1 | 术语 · 同义词 · 技术字段映射 · 边界 |
-| `architecture.md` | L1 | 服务拓扑 · 模块职责 · 依赖关系 |
-| `adr.md` | L1 | 备选方案 · 取舍分析 · 决策后果 |
-| `requirement.md` | L1 | 用户故事 · 验收标准 |
-| `solution.md` | L2 | 背景目标 · 详细设计 · 影响面 |
-| `flow.md` | L2 | 触发条件 · 主流程 · 异常分支 |
-| `incident.md` | L2 | 时间线 · 5 Whys · 带负责人的改进措施 |
-| `bizrule.md` | L2 | 适用条件 · 计算公式 · 历史变更 |
-| `api.md` | L3 | 请求 · 响应 · 错误码 |
-| `data.md` | L3 | DDL · 字段 · 索引 |
-| `ops.md` | L3 | 超时 · 告警 · 限流 |
-| `meeting.md` | — | 讨论要点 · 结论 · Action Items |
-
-录入流程新增**两个关键节点**：
-
-- **Step 2.5 — 模板加载**：AI 推断出 type 后，读取 `_registry.yaml` 定位匹配骨架，写入前先按模板整理正文。
-- **Step 8.5 — 质量门禁**：逐项校验 `required_sections`，运行 `quality_gate` 检查，不达标时拦截并返回缺失清单。
-
-**示例质量门禁：**
-
-| 类型 | 门禁规则 |
-|------|---------|
-| `glossary` | 必须包含 ≥1 个技术字段名映射（后端 / 数据库 / 前端） |
-| `incident` | 每条改进措施须有负责人和截止日；根因不能停留在表面现象 |
-| `api` | 请求/响应字段必须标注类型；至少 1 个错误码 |
-| `bizrule` | 逻辑必须可被代码实现 — 需包含具体公式或判断分支 |
-
-<details>
-<summary>完整注册表与门禁规范 →</summary>
-
-所有 type 定义和门禁规则见 [`references/templates/_registry.yaml`](references/templates/_registry.yaml)。
-
-设计取舍与 GSD Artifact Taxonomy 的对比见 [`DESIGN.md`](./DESIGN.md) — 第九节「模板库机制」。
-
-</details>
-
----
-
-## 文档格式
-
-每条知识条目使用 YAML frontmatter：
-
-```yaml
----
-title: 打印服务超时机制
-type: ops
-tags: [print, timeout, fallback]
-owner: "@hanqiang"
-created: 2026-05-12
-expires: 2026-08-12        # 默认：创建后 90 天。填 "never" 表示永久有效。
-status: draft              # draft | active | deprecated | canonical
-sources:
-  - "手工录入 @hanqiang 2026-05-12"
-related:
-  - "[[print-service-overview]]"
----
-```
-
-**status 生命周期：**
-
-```
-draft ──(health audit)──▶ active ──(health deprecate)──▶ deprecated
-                               ╲
-                                ──(手动晋升)──▶ canonical
-```
-
-| status | 含义 | AI 行为 |
-|--------|------|---------|
-| `draft` | 草稿，待确认 | 可参考，不作决策依据 |
-| `active` | 正式有效 | 正常检索引用 |
-| `deprecated` | 已废弃 | 禁止引用 |
-| `canonical` | 权威锁定 | 最高优先级；AI 禁止修改 |
-
----
-
-## Git Hooks
-
-`/knowledge-wiki init` 自动安装两个 hook：
-
-### `pre-push` — 阻断式
-
-每次 `git push` 前运行，检查：
-
-- 知识文档是否在 **7 天内**到期或已过期
-- `.sources.yaml` 中的外部源是否超过 **30 天**未同步
-
-发现问题时提示：
-
-```
-[1] 现在处理   [2] 跳过   [3] 中止 push
-```
-
-> [!IMPORTANT]
-> Hook **无问题时完全静默** — 不会拖慢正常 push 流程。
-
-### `commit-msg` — 非阻断提示
-
-commit message 含 `[kb]` 标记时触发：
-
-```bash
-git commit -m "fix: 修复打印超时未重置问题 [kb]"
-# → 提示：知识库中有 ops/print-timeout.md，建议更新
-```
-
-不阻断 commit，仅输出建议。
-
----
-
-## 外部源管理
-
-在 `.knowledge/.sources.yaml` 注册需要持续追踪的外部文档：
-
-```yaml
-sources:
-  - id: print-api-doc
-    name: 打印接口文档
-    url: https://docs.apipost.net/docs/detail/xxx
-    tracked_by: "@hanqiang"
-    last_hash: ""
-    last_synced: ""
-    status: active          # active | stale | error
-    related_docs:
-      - apis/print-api.md
-```
-
-`/knowledge-wiki health scan` 拉取每个注册 URL，计算内容 hash，发现变更后提示处理 — **不自动覆盖**本地文档。
-
----
-
-## 工具依赖
-
-`/knowledge-wiki init` 在创建任何文件前自动检查依赖。
-
-### Group A — 必需工具
-
-| 工具 | 必需性 | 用途 |
-|------|:------:|------|
-| `rg`（ripgrep） | ✅ | 全文检索与反向追溯 |
-| `git` | ✅ | Hook 安装 |
-| `jq` | 可选 | Hook 脚本解析 frontmatter |
-
-### Group B — 浏览器自动化（处理 URL 录入）
-
-> [!NOTE]
-> 全部可选。该组中任一工具已安装即可处理 URL 录入。
-
-| 工具 | 适用场景 |
-|------|---------|
-| `agent-browser` | 通用 AI 原生首选（轻量、50+ 命令） |
-| `browser-harness` | 选择器易变 / 动态渲染页面 |
-| `playwright` | 流程固定的批量录入 / 扫描 |
-| `browser-use` | 多步骤 LLM 自主决策 |
-| `page-agent` | 中文网页站点 |
-
-```bash
-bash references/scripts/check-deps.sh                    # 仅检查
-bash references/scripts/check-deps.sh --install          # 安装缺失的 Group A 工具
-bash references/scripts/check-deps.sh --install-browser  # 安装全部 Group B 工具
-```
-
-自动选择当前系统的包管理器：`brew` · `apt` · `yum` · `npm` · `pipx`。
-
----
-
-## 设计原则
-
-1. **无来源不写、不答** — `sources` 必填；`ask` 无记录时明确告知，不猜测。
-2. **术语唯一定义** — 定义锚点在 `glossary/`；所有文档通过 `[[slug]]` 引用，不重复定义。
-3. **草稿优先** — 新条目默认 `status: draft`；由 `health audit` 人工晋升。
-4. **rg 零索引追溯** — 正反向追溯直接扫描 Markdown，无需维护 JSON 索引文件。
-5. **静默放行** — Hook 和 `health rot` 无问题时完全不输出，不干扰正常工作流。
-6. **deprecate 必处理引用** — 废弃前用 `rg` 找出所有引用处，防止悬空链接。
-7. **工具检查门** — `init` 缺必需工具时中止，不留部分初始化状态。
-8. **模板即合约** *(v0.6.0)* — 录入正文严格按 `templates/{type}.md` 骨架生成；AI 不允许自行增删一级标题；Step 8.5 门禁强制校验必填段。
-
----
-
-## 使用示例
-
-<details>
-<summary>录入示例</summary>
-
-```bash
-# 从飞书文档录入
-/knowledge-wiki in https://xxx.feishu.cn/docx/xxx
-
-# 从飞书知识库录入
-/knowledge-wiki in https://xxx.feishu.cn/wiki/xxx
-
-# 手工录入一条知识
-/knowledge-wiki in "打印服务超时是 30s，超时后 fallback 到本地缓存"
-
-# 从代码文件提炼设计知识
-/knowledge-wiki in ./src/print/service.go
-
-# 注册外部知识源（持续追踪变更）
-/knowledge-wiki in source add https://docs.apipost.net/docs/detail/xxx --name "打印接口文档"
-```
-
-</details>
-
-<details>
-<summary>查询与追溯示例</summary>
-
-```bash
-# 提问 — 回答总会引用来源文档
-/knowledge-wiki ask "打印服务的超时配置是多少？"
-
-# 谁引用了这篇文档？
-/knowledge-wiki ask links print-timeout
-
-# 这篇文档引用了哪些？
-/knowledge-wiki ask refs print-timeout
-```
-
-</details>
-
-<details>
-<summary>维护示例</summary>
-
-```bash
-# 检查外部源是否有更新
-/knowledge-wiki health scan
-
-# 查看过期或即将过期的文档
-/knowledge-wiki health rot
-
-# 确认文档仍有效（重置过期时间 +90 天）
-/knowledge-wiki health audit print-timeout
-
-# 废弃过期文档（先处理所有引用）
-/knowledge-wiki health deprecate old-print-config
-```
-
-</details>
 
 ---
 
 ## 资源索引
 
-| 文件 | 用途 |
-|------|------|
-| [`SKILL.md`](./SKILL.md) | Skill 主入口 — 工具表、子命令骨架、AI 调用规则 |
-| [`DESIGN.md`](./DESIGN.md) | 架构取舍、分层模型、模板库设计原理 |
-| [`references/directory-structure.md`](references/directory-structure.md) | `.knowledge/` 目录树 + 根文件模板 |
-| [`references/ingestion-rules.md`](references/ingestion-rules.md) | 11 步录入流程、slug 规则、质量门禁 |
-| [`references/ask-rules.md`](references/ask-rules.md) | 两层检索、回答格式、时效计算、links/refs |
-| [`references/health-rules.md`](references/health-rules.md) | rot · scan · coverage · audit · deprecate 规范 |
-| [`references/url-handling.md`](references/url-handling.md) | URL 路由规则、飞书子流程、scan 路由 |
-| [`references/templates/_registry.yaml`](references/templates/_registry.yaml) | 中央类型注册表 → 模板 + 必填段 + 门禁 |
-| [`references/scripts/check-deps.sh`](references/scripts/check-deps.sh) | 依赖检查 + 一键安装 |
+| 路径 | 用途 |
+|---|---|
+| `SKILL.md` | skill 主入口 —— 工具表 + 子命令骨架 |
+| `DESIGN.md` | L1/L2/L3 分层架构 + 模板库机制设计 |
+| `TODO.md` | 待实现能力清单 + 版本规划 |
+| `references/directory-structure.md` | `.knowledge/` 完整目录框架 + 根文件模板 |
+| `references/url-handling.md` | URL 处理铁律 + 域名路由子流程 + scan 路由 |
+| `references/ingestion-rules.md` | AI 结构化录入流程（14 步） |
+| `references/index-rules.md` | 分段索引规则（三层数据准确性保证） |
+| `references/log-rules.md` | 操作日志规则（按人分文件 / 归档 / digest） |
+| `references/backlink-rules.md` | 双向 related 回写规则（pending 队列 / 延迟消费） |
+| `references/lint-rules.md` | 一致性检查规则（L1–L9 / --fix 安全边界） |
+| `references/templates/_registry.yaml` | 模板注册表（9 个 type）+ 必填段 + 质量门禁 |
+| `references/templates/{type}.md` | 9 个 type 专属正文骨架模板 |
+| `references/templates/_meta.yaml.tpl` | 索引元数据初始化模板 `v0.8.1` |
+| `references/templates/_logs_config.yaml.tpl` | 日志配置初始化模板 `v0.8.1` |
+| `references/templates/_pending_backlinks.yaml.tpl` | 空队列初始化模板 `v0.8.1` |
+| `references/templates/_idx_empty.md.tpl` | 通用 idx 表头模板 `v0.8.1` |
+| `references/ask-rules.md` | 三层检索 + log 记录 + ask 回流提示 |
+| `references/health-rules.md` | 综合报告 + 所有 health 子命令 |
+| `references/scripts/check-deps.sh` | 工具依赖检查 + 一键安装 |
+| `references/scripts/pre-commit.sh` | git pre-commit hook `v0.9.0` |
+| `references/scripts/post-merge.sh` | git post-merge hook `v0.9.0` |
+| `references/scripts/pre-push.sh` | git pre-push hook |
+| `references/scripts/commit-msg.sh` | git commit-msg hook |
+
+完整版本变更记录见 [`CHANGELOG.md`](./CHANGELOG.md)
 
 ---
 
-## 更新日志
+## 协议
 
-完整版本历史见 [`CHANGELOG.md`](./CHANGELOG.md)。
-
----
-
-<div align="center">
-
-为希望让知识保持活力、而不只是归档的团队而生。
-
-</div>
+[MIT](./LICENSE)

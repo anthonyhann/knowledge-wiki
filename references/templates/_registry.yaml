@@ -27,7 +27,16 @@ templates:
     optional_sections:
       - 使用场景
       - 边界（不是什么）
-    quality_gate: "至少包含一个技术字段名（后端字段 / 数据库列 / 前端命名）映射"
+    # 同义词与别名表的 5 列：业务方/产品 | 前端 | 后端代码 | 数据库 | 三方/外部
+    # 分级标准（最低门槛 → 黄金标准）：
+    #   - bronze（强制门槛，8.5 必通过）：5 列中至少 1 列已填（且必须是技术列：前端/后端/数据库 三选一）
+    #   - silver（推荐）：3 列已填，覆盖业务方 + 前端 + 后端
+    #   - gold（最佳实践）：5 列全填，前后端语义完全对齐
+    quality_gate: "至少包含一个技术字段名映射（前端命名 / 后端字段或类名 / 数据库列名 三选一即达标 bronze）；建议升级到 silver（业务方+前端+后端 三列）或 gold（5 列全填）"
+    quality_tiers:
+      bronze: "技术列至少 1 列已填（前端 / 后端 / 数据库 三选一）"
+      silver: "≥ 3 列已填，覆盖业务方 + 前端 + 后端"
+      gold:   "5 列全填，跨上下文语义完全对齐"
 
   architecture:
     file: architecture.md
@@ -126,9 +135,9 @@ templates:
       - 字段映射
     quality_gate: "请求参数与响应结构必须完整列出字段类型；错误码至少 1 个"
 
-  data:
-    file: data.md
-    target_dir: data/
+  db:
+    file: db.md
+    target_dir: db/
     layer: L3
     expires_days: 90
     required_sections:
@@ -158,54 +167,44 @@ templates:
       - 部署位置
     quality_gate: "运行参数必须有具体数值（超时/重试/并发）"
 
-  incident:
-    file: incident.md
-    target_dir: incidents/
+  case:
+    file: case.md
+    target_dir: case/
     layer: L2
-    expires_days: 365           # 故障复盘保留 1 年
+    expires_days: 365           # 反向示例 / 问题汇总保留 1 年
     required_sections:
       - TL;DR
+      - 问题概述
+      - 影响与场景
+      - 根因或反例分析
+      - 改进或规避措施
+    optional_sections:
       - 时间线
-      - 影响范围
-      - 根因分析
-      - 改进措施
-    optional_sections:
-      - 修复措施
+      - 反例代码
+      - 问题清单
       - Use Case 价值
-      - 关联事故
-    quality_gate: "改进措施必须有负责人与截止日；根因不能停留在表面现象"
+      - 关联案例
+    quality_gate: "至少包含 1 个反例代码片段或问题清单条目；改进/规避措施必须可执行（含责任人或代码层约束）"
 
-  bizrule:
-    file: bizrule.md
-    target_dir: bizrules/
-    layer: L2
-    expires_days: 180
+  synthesis:                       # [v0.8.0 新增] Ask 回流综合分析文档
+    file: synthesis.md
+    target_dir: synthesis/          # 独立目录，不和业务文档混
+    layer: L2                      # 编排层（综合多个知识点的派生知识）
+    expires_days: 60                # 较短过期：派生知识依赖原始文档，原始过期后应重新评估
     required_sections:
       - TL;DR
-      - 规则描述
-      - 适用条件
-      - 计算/判断逻辑
+      - 综合问题
+      - 来源文档
+      - 综合结论
     optional_sections:
-      - 边界场景
-      - 历史变更
-      - 关联流程
-    quality_gate: "计算/判断逻辑必须可被代码实现（含具体公式或分支）"
-
-  meeting:
-    file: meeting.md
-    target_dir: meetings/
-    layer: 辅助
-    expires_days: 180
-    required_sections:
-      - TL;DR
-      - 会议信息
-      - 讨论要点
-      - 结论与 Action
-    optional_sections:
-      - 待跟进项
-      - 参会人
-      - 关联文档
-    quality_gate: "结论与 Action 必须有责任人，至少 1 项"
+      - 对比分析
+      - 关联发现
+      - 局限与假设
+    quality_gate: "来源文档必须 ≥2 篇且均非 deprecated；综合结论必须有明确论点，不能是原文拼接"
+    # synthesis 特殊约束：
+    #   1. 禁止二次回流：synthesis 文档不能再通过 ask 回流生成新 synthesis
+    #   2. derived_from 字段必填：记录所有被综合的原始文档 slug
+    #   3. derived_question 记录触发此综合分析的原始问题
 
 # ----------------------------------------------------------------------
 # AI 选择模板的伪代码：

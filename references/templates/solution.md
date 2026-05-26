@@ -19,7 +19,7 @@ created: {YYYY-MM-DD}
 expires: {YYYY-MM-DD}                          # 默认 90 天，需求关闭后可标 deprecated
 status: draft
 sources:
-  - "{来源：PRD / 飞书文档 URL / 评审纪要}"
+  - "{来源：PRD / 飞书 URL / 评审纪要}"
 related:
   - "[[{关联需求 slug}]]"
   - "[[{关联架构 slug}]]"

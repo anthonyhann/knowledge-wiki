@@ -22,6 +22,8 @@
 
 ## 二、L1 / L2 / L3 三层认知架构
 
+> **单一权威源**：每个 type 的 `layer` 字段以 `references/templates/_registry.yaml` 为准；本文件的 L1/L2/L3 映射表是它的概念视图。新增/调整 type 时**必须先改 yaml**，再同步本文档与 `references/ingestion-rules.md` 的映射表，三处保持一致。
+
 ### 总览
 
 | 层级 | 别名 | 认知角色 | 核心问题 | 知识对象类型 |
@@ -77,9 +79,8 @@
 
 | 目录 | type | 承载的 L2 知识 |
 |------|------|---------------|
-| `flows/` | `flow` | 核心业务流程 SOP、时序图、分支判断逻辑 |
-| `bizrules/` | `bizrule` | 业务规则、计费策略、运营+技术共用的判断逻辑 |
-| `incidents/` | `incident` | 故障复盘（反例 Use Case，驱动 SOP 的防护措施） |
+| `flows/` | `flow` | 核心业务流程 SOP、时序图、分支判断逻辑、业务规则与计算公式 |
+| `case/` | `case` | 反向示例 / 问题汇总 / 故障复盘（反例 Use Case，驱动 SOP 的防护措施） |
 | `design/` | `solution` | 某需求的技术方案（时间点快照，是 L2 的决策记录） |
 
 **Use Case 是成败关键**：如果不提供典型的改造案例，大模型会自行漫无边界地检索相似代码，极易产生幻觉。主动提供结构化的高质量 Use Case 约束，能将 AI 出码可用性从不稳定提升到 80%–90%。
@@ -105,48 +106,20 @@
 | 目录 | type | 承载的 L3 知识 |
 |------|------|---------------|
 | `apis/` | `api` | 接口约定、字段映射、请求响应结构 |
-| `data/` | `data` | 数据模型、存储设计、索引策略 |
+| `db/` | `db` | 数据模型、存储设计、索引策略 |
 | `ops/` | `ops` | 运维手册、告警阈值、大促保障、超时配置 |
 
 ---
 
 ## 三、目录框架完整映射表
 
-```
-.knowledge/
-├── README.md               ← 双受众入口（顶部给 AI，底部给人类）
-├── CLAUDE.md               ← AI 协作契约 + 禁止行为 + 黄金原则
-├── AGENTS.md               ← AI 地图（≤50 行）
-├── .sources.yaml           ← 外部知识源注册表
-│
-├── glossary/               ← L1：术语词典（全局唯一锚点，最先写）
-├── design/                 ← L1/L2：架构/技术方案/决策（type 字段区分）
-├── requirements/           ← L1：需求文档、PRD、验收标准
-├── flows/                  ← L2：核心业务流程 SOP
-├── bizrules/               ← L2：业务规则（运营+技术共用）
-├── incidents/              ← L2：故障复盘（反例 Use Case）
-├── apis/                   ← L3：接口约定、字段映射
-├── data/                   ← L3：数据模型、存储设计
-├── ops/                    ← L3：运维、告警、大促保障
-├── meetings/               ← 辅助：会议记录、对齐结论
-└── people/{user-id}/       ← 辅助：个人上下文（AI 只读）
-```
-
-| 目录 | 知识层级 | type 字段 | 核心职责 | 典型内容举例 |
-|------|----------|-----------|----------|-------------|
-| `glossary/` | L1 | `glossary` | 全局唯一术语锚点，所有文档用 `[[slug]]` 引用 | "配送单"、"follow_key"、"动线区块"的业务定义 |
-| `design/` | L1 | `architecture` | 系统架构现状（活文档，持续更新） | 整体服务拓扑图、模块职责说明 |
-| `design/` | L1/L2 | `adr` | 架构决策记录（为什么这样选） | 选型 Redis vs MySQL 的决策记录 |
-| `design/` | L2 | `solution` | 某需求的技术方案（时间点快照） | 配送发单重构方案 |
-| `requirements/` | L1 | `requirement` | PRD、feature spec、验收标准 | 配送发单功能需求文档 |
-| `flows/` | L2 | `flow` | 核心业务流程 SOP，含分支与人工节点 | 配送下单完整时序、退款流程分支判断 |
-| `bizrules/` | L2 | `bizrule` | 业务规则、计费策略，运营+技术共用 | 小费计算规则、违约金扣除条件 |
-| `incidents/` | L2 Use Case | `incident` | 故障复盘与根因分析，反例驱动 SOP 防护 | 2026-05 配送队列堆积事故复盘 |
-| `apis/` | L3 | `api` | 接口约定、字段映射、请求响应结构 | 三方配送接口字段说明、open-api 回调协议 |
-| `data/` | L3 | `data` | 数据模型、存储设计、索引策略 | 订单表结构、Redis key 命名规范 |
-| `ops/` | L3 | `ops` | 运维手册、告警阈值、大促保障、超时配置 | 打印服务超时阈值 30s、大促限流配置 |
-| `meetings/` | 辅助 | `meeting` | 会议记录、对齐结论，作为决策的溯源证据 | 架构评审结论、跨团队对齐纪要 |
-| `people/{user-id}/` | 辅助 | — | 个人上下文，AI 只读 | 个人技术偏好、负责模块说明 |
+> **目录树、目录职责速查、layer/type 完整映射表**统一维护在 [`references/directory-structure.md`](./references/directory-structure.md)（单一权威源）。本节不重复展开，避免漂移。
+>
+> 简略对应关系（详细见单一权威源「目录与 type 完整映射表」）：
+>
+> - **L1 领域层** → `glossary/`（glossary）、`design/`（architecture / adr）、`requirements/`（requirement）
+> - **L2 执行层** → `flows/`（flow）、`case/`（case）、`design/`（solution）
+> - **L3 能力层** → `apis/`（api）、`db/`（db）、`ops/`（ops）
 
 ---
 
@@ -166,9 +139,9 @@
 
 **场景**："小费在配送完成后 T+1 结算，但如果配送商是自营则实时结算"——这类规则通常只存在于老员工的记忆里。AI 生成结算代码时按通用逻辑处理，产生错误。
 
-**解法**：录入 `bizrules/` 后，AI 在生成结算相关代码时会主动检索并遵守这条规则，而不是按通用逻辑生成错误代码。
+**解法**：将这类业务规则作为「计算/判断逻辑」章节录入 `flows/`（例如 `flows/tip-settlement.md`）。AI 在生成结算相关代码时会检索到该流程文档并遵守其中的规则分支，避免按通用逻辑生成错误代码。
 
-**对应层级**：L2 `bizrules/`
+**对应层级**：L2 `flows/`（业务规则与业务流程同层级维护）
 
 ---
 
@@ -176,9 +149,9 @@
 
 **场景**：配送队列堆积事故已发生过两次，但每次 AI 生成消费者代码时都不会主动加入防护措施。
 
-**解法**：`incidents/` 存储故障复盘，作为 Use Case 挂载在 L2 的 SOP 上。当 AI 下次处理类似的队列消费逻辑时，会检索到历史事故记录，主动在方案中加入防护措施。
+**解法**：`case/` 不仅存储故障复盘，还包括反例代码、踩坑总结、问题汇总等反向示例，作为 Use Case 挂载在 L2 的 SOP 上。当 AI 下次处理类似场景时，会检索到历史案例记录，主动在方案中加入防护措施与反例规避。
 
-**对应层级**：L2 Use Case `incidents/`
+**对应层级**：L2 Use Case `case/`
 
 ---
 
@@ -186,7 +159,7 @@
 
 **场景**：需求涉及 11 个 API、8 个后端服务、跨 13 个仓库，AI 仅依赖代码仓库时识别服务准确率低且不稳定。
 
-**解法**：构建极简版领域知识库（4 个核心文件）：领域术语表（`glossary/`）、服务角色说明（`design/architecture`）、领域能力边界（`design/adr`）、典型改造案例（`incidents/` + `flows/`）。渐进式匹配流程：输入需求 → 匹配领域术语 → 定位领域能力 → 匹配典型案例 → 产出概要设计 → 人工 Review → 出码。代码可用性达 80%–90%。
+**解法**：构建极简版领域知识库（4 个核心文件）：领域术语表（`glossary/`）、服务角色说明（`design/architecture`）、领域能力边界（`design/adr`）、典型改造案例（`case/` + `flows/`）。渐进式匹配流程：输入需求 → 匹配领域术语 → 定位领域能力 → 匹配典型案例 → 产出概要设计 → 人工 Review → 出码。代码可用性达 80%–90%。
 
 **对应层级**：L1 + L2 协同
 
@@ -198,7 +171,7 @@
 
 **解法**：`health rot` 通过 `expires` 字段扫描过期文档；`health scan` 追踪 `.sources.yaml` 中注册的外部源（飞书文档、ApiPost 接口文档）是否有变更，diff 出变更后提示人工决策是否同步，不自动覆盖。
 
-**对应层级**：L3 `apis/` + `health` 维护机制
+**对应层级**：L3 `apis/` / `db/` + `health` 维护机制
 
 ---
 
@@ -212,13 +185,12 @@
   → 确认服务归属（design/architecture）
 
 阶段 2：再定执行方案（L2）
-  → 匹配业务流程（flows/）
-  → 检索典型案例（incidents/）
-  → 确认业务规则（bizrules/）
+  → 匹配业务流程与业务规则（flows/）
+  → 检索典型案例与反例（case/）
 
 阶段 3：最后调用原子能力（L3）
   → 查接口约定（apis/）
-  → 查数据模型（data/）
+  → 查数据模型（db/）
   → 查运维配置（ops/）
 ```
 
@@ -246,7 +218,7 @@
 | `health rot` | 定期或 pre-push 时 | 扫描 `expires` 字段，列出 EXPIRED / WARNING 文档，批量决策入口 |
 | `health scan` | 外部源可能有更新时 | 遍历 `.sources.yaml`，diff 内容变更，提示人工决策是否同步 |
 | `health coverage` | 新模块上线后 | 扫描项目顶层目录，比对 `.knowledge/` tags，输出未覆盖模块 |
-| `health audit <slug>` | 人工确认某篇文档仍有效 | status → active，expires → 今日 +90 天 |
+| `health audit <slug>` | 人工确认某篇文档仍有效 | status → active；expires 按 type 分支：glossary/adr 保持 never，其他按 `_registry.yaml.expires_days` 续期 |
 | `health deprecate <slug>` | 文档已过时 | rg 查所有引用 → 确认后 status → deprecated，引用处追加注释 |
 
 ### AIDLC 反馈闭环
@@ -258,7 +230,7 @@
   → AI 出码（消费 L1/L2/L3 知识）
   → 代码 Review / 联调
   → PR 合并（触发 commit-msg hook，提示知识更新）
-  → 故障/复盘（录入 incidents/，更新 flows/）
+  → 故障/复盘/反例（录入 case/，更新 flows/）
   → 知识库健康检查（health rot / scan）
   → 知识升级（audit → active → canonical）
   → 下一次需求输入（更高质量的知识驱动）
@@ -273,7 +245,7 @@
 ```bash
 cd ~/your-project
 /knowledge-wiki init
-# → 自动检查工具依赖（rg / git）
+# → 自动检查工具依赖（rg / git / 浏览器工具）
 # → 创建 11 个目录 + 4 个根文件
 # → 安装 git hooks（pre-push + commit-msg）
 ```
@@ -291,10 +263,10 @@ cd ~/your-project
 
 **Step 3：按需录入，不追求一次完整**
 
-遇到业务流程录 `flows/`，遇到故障录 `incidents/`，遇到接口约定录 `apis/`。新录入一律 `draft`，经人工 audit 后升级为 `active`：
+遇到业务流程与业务规则录 `flows/`，遇到故障/反例/踩坑总结录 `case/`，遇到接口约定录 `apis/`，遇到表结构录 `db/`。新录入一律 `draft`，经人工 audit 后升级为 `active`：
 
 ```bash
-/knowledge-wiki in https://xxx.feishu.cn/docx/xxx           # 飞书文档
+/knowledge-wiki in https://xxx.feishu.cn/docx/xxx          # 飞书文档（走浏览器自动化）
 /knowledge-wiki in ./docs/delivery-flow.md                  # 本地文件
 /knowledge-wiki in "小费计算规则：配送完成后 T+1 结算..."   # 手工录入
 ```
@@ -329,10 +301,11 @@ cd ~/your-project
 1. **无来源不写、不答** — `sources` 必填；`ask` 无知识库记录时明确告知，不用模型训练知识填补
 2. **术语唯一** — 术语定义锚点在 `glossary/`，其他文档用 `[[slug]]` 引用，不重复定义
 3. **草稿优先** — 新录入一律 `status: draft`，由 `health audit` 人工升级，不跳过确认
-4. **deprecate 必处理引用** — 废弃文档前用 rg 找出所有引用处，防止悬空链接
-5. **前后端同库** — 同一业务领域的前后端知识放在同一个库中联合维护，避免语义割裂
-6. **渐进式加载** — 按 L1 → L2 → L3 阶段按需加载，不一次性暴露所有细节
-7. **模板为合约** — 录入正文严格按 `references/templates/{type}.md` 骨架生成；AI 不允许自行增删一级标题，必填段不齐时 8.5 门禁拦截
+4. **按域名路由浏览器自动化** — 内部文档 URL 按域名路由到浏览器工具，未装时强制提示安装
+5. **deprecate 必处理引用** — 废弃文档前用 rg 找出所有引用处，防止悬空链接
+6. **前后端同库** — 同一业务领域的前后端知识放在同一个库中联合维护，避免语义割裂
+7. **渐进式加载** — 按 L1 → L2 → L3 阶段按需加载，不一次性暴露所有细节
+8. **模板为合约** — 录入正文严格按 `references/templates/{type}.md` 骨架生成；AI 不允许自行增删一级标题，必填段不齐时 8.5 门禁拦截
 
 ---
 
@@ -343,7 +316,7 @@ cd ~/your-project
 早期设计中，所有 type 共享一套「TL;DR + 详情」二段式。在落地中遇到三个问题：
 
 - **glossary** 缺少同义词 / 技术字段名映射 → 前后端语义仍割裂
-- **incident** 缺少时间线 / 5 Whys 根因 / 改进措施责任人 → Use Case 无法反哺 AI
+- **case**（反向示例 / 故障复盘）缺少时间线 / 5 Whys 根因 / 改进措施责任人 / 反例代码 → Use Case 无法反哺 AI
 - **api** 缺少请求/响应字段表 / 错误码 / 超时限流 → AI 生代码时仍需重新推导
 
 参考 GSD 的 **Artifact Taxonomy**（制品分类法，40+ 个模板覆盖不同阶段产出），knowledge-wiki 从 v下一版起按 type 提供专属骨架。
@@ -353,18 +326,16 @@ cd ~/your-project
 ```
 references/templates/
 ├── _registry.yaml          ← 中央注册表：type → 文件 + 必填段 + 质量门禁 + 层级 + expires_days
-├── glossary.md           ← 12 个 type 专属模板，顶部 HTML 注释声明：
+├── glossary.md           ← 各 type 专属模板（含 synthesis 共 9 个），顶部 HTML 注释声明：
 ├── architecture.md             • 必填段
 ├── solution.md                 • 质量门禁
 ├── adr.md                      • 填写指南
 ├── requirement.md
 ├── flow.md
 ├── api.md
-├── data.md
+├── db.md
 ├── ops.md
-├── incident.md
-├── bizrule.md
-└── meeting.md
+└── case.md
 ```
 
 ### AI 选择模板的伪代码

@@ -1,29 +1,42 @@
 # URL 处理详细规则
 
-> 由 `/knowledge-wiki in <url>` 与 `/knowledge-wiki health scan` 共享。SKILL.md 仅保留铁律表与索引，本文件是唯一权威源。
+> 由 `/knowledge-wiki in <url>` 与 `/knowledge-wiki health scan` 共享。SKILL.md 仅保留路由表与索引，本文件是唯一权威源。
 
 ---
 
-## 工具选型铁律（按 URL 域名硬路由）
+## 工具选型（按 URL 域名路由浏览器自动化）
 
-| URL 域名 | 必走工具 | 备注 |
+| URL 域名 | 必走工具 | 说明 |
 |---------|---------|------|
-| xxx.feishu.cn / feishu.cn | agent-browser | 飞书文档需 DOM 抽取 |
-| larkoffice.com | agent-browser | 飞书国际版，同上 |
+| larkoffice.com / feishu.cn | agent-browser | 飞书无开放 API，需 DOM 抽取 |
 | apipost.net | agent-browser（遍历目录树） | 接口文档需逐节点抓取 |
 | 其他公网 URL | agent-browser | 通用 DOM 抽取 |
 
 ---
 
-## 飞书文档处理
+## 飞书 URL 处理（浏览器自动化）
 
-URL 形如 `https://xxx.feishu.cn/docx/{docToken}` 或 `https://xxx.feishu.cn/wiki/{wikiToken}`，与通用 URL 处理流程相同，使用浏览器自动化工具抓取正文。
+URL 形如 `https://xxx.feishu.cn/docx/{docId}` 或 `https://xxx.larkoffice.com/wiki/{wikiId}`：
+
+```
+1. agent-browser goto <url>
+2. HTTP 状态检查：
+   - 4xx → 中止，输出："URL 不可达（HTTP {code}）：{url}"
+   - 5xx → 中止，输出："目标站点错误（HTTP {code}），稍后重试"
+   - 超时 (>30s) → 中止，输出："agent-browser 加载超时，URL：{url}"
+3. 登录检测：`agent-browser get title` 含"登录"/"Login"/"Sign in"
+   → 中止，输出："检测到登录页面，请先在浏览器中登录后重试。"
+   登录后可重新执行 `/knowledge-wiki in <url>` 继续
+4. 提取正文（按下方选择器 + 去噪规则）
+5. 提取结果为空（去噪后 <100 字符）→ 中止，输出："正文提取为空，请确认 URL 内容或改用文本输入"
+6. 进入 AI 结构化流程，sources 字段记录原 URL + "（同步于 YYYY-MM-DD via agent-browser）"
+```
 
 ---
 
-## 通用 URL 处理（浏览器自动化生态）
+## 公网 URL 处理（浏览器自动化生态）
 
-适用于 feishu.cn / larkoffice.com / apipost.net / 其他公网 URL。
+适用于 apipost.net / 其他公网 URL（飞书 URL 走上方专用流程）。
 
 ### 工具选择（按场景，任选其一即可）
 
@@ -73,9 +86,10 @@ URL 形如 `https://xxx.feishu.cn/docx/{docToken}` 或 `https://xxx.feishu.cn/wi
 ```
 1. 读取 .sources.yaml，遍历 status=active 的源
 2. 按域名路由：
-   - 所有域名 → agent-browser goto <url> + 登录检测 + 选择器+去噪
+   - larkoffice.com / feishu.cn → agent-browser goto <url> + 登录检测 + 选择器+去噪
+   - 其他域名 → agent-browser goto <url> + 登录检测 + 选择器+去噪
 3. 提取失败处理：
-   - 登录页 / 4xx / 5xx / 超时 → 标记 status=error，跳过，提示用户
+   - 4xx / 5xx / 超时 → 标记 status=error，note 记录原因，跳过，提示用户
 4. 计算 content_hash，对比 last_hash：
    相同 → 更新 last_synced，无输出
    不同 → 输出变更（diff 行数估计），等待用户选择：
@@ -85,7 +99,7 @@ URL 形如 `https://xxx.feishu.cn/docx/{docToken}` 或 `https://xxx.feishu.cn/wi
 5. 处理完成后更新 .sources.yaml
 ```
 
-**content_hash 算法**：取去噪后正文 → trim → 折叠连续空白为单空格 → UTF-8 编码 → `sha1` 取前 12 位十六进制（如 `a1b2c3d4e5f6`）。仅 hash 正文文本，忽略图片二进制和 DOM 属性，确保排版微调不触发 false positive。
+**content_hash 算法**：取正文（去噪后文本） → trim → 折叠连续空白为单空格 → UTF-8 编码 → `sha1` 取前 12 位十六进制（如 `a1b2c3d4e5f6`）。仅 hash 正文文本，忽略图片二进制和 DOM 属性，确保排版微调不触发 false positive。
 
 **异常处理**：agent-browser 超时（>30s）或崩溃 → 标记该源 `status: error`，输出错误信息，继续处理下一个源，不中止整个 scan。
 

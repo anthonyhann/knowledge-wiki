@@ -1,6 +1,6 @@
 <!--
-模板：data（数据模型）
-位置：.knowledge/data/{slug}.md
+模板：db（数据模型 / 存储）
+位置：.knowledge/db/{slug}.md
 层级：L3（原子能力——存储）
 必填段：TL;DR / 数据模型 / 字段定义
 质量门禁：字段定义必须包含类型、是否可空、业务含义
@@ -12,7 +12,7 @@
 -->
 ---
 title: {数据模型名称}                          # 例：配送单表 delivery_order
-type: data
+type: db
 tags: [{3-5 个标签}]
 owner: "@{mis-id}"
 created: {YYYY-MM-DD}

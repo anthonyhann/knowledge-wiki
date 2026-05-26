@@ -39,13 +39,14 @@ CORE_TOOLS=(
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Group B：浏览器/文档自动化生态（按场景互补，全部 OPTIONAL）
+# 飞书/公网 URL：按场景任选其一即可
 # ─────────────────────────────────────────────────────────────────────────────
 BROWSER_TOOLS=(
   "agent-browser|OPTIONAL|AI工具调用的极速瑞士军刀|轻量·ref引用·50+命令；URL 抽取首选|npm i -g @aigc/agent-browser|npm i -g @aigc/agent-browser"
   "browser-harness|OPTIONAL|AI编程助手的自愈浏览器手|Claude Code·自愈·动态页面；选择器易变页面优选|npm i -g @aigc/browser-harness|npm i -g @aigc/browser-harness"
   "playwright|OPTIONAL|工程化测试的坚实基石|E2E测试·稳定·详细报告；流程固定的录入/扫描自动化|npm i -g playwright && npx playwright install chromium|npm i -g playwright && npx playwright install chromium"
   "browser-use|OPTIONAL|LLM 自主操作的完整大脑|Python·规划·Deep Research；多步骤自主决策录入|pipx install browser-use 2>/dev/null || pip3 install --user browser-use|pipx install browser-use 2>/dev/null || pip3 install --user browser-use"
-  "page-agent|OPTIONAL|中文网页理解的领域专家|中文优化·多模态；中文网页站点优选|npm i -g page-agent|npm i -g page-agent"
+  "page-agent|OPTIONAL|中文网页理解的领域专家|阿里系·中文优化·多模态；中文/阿里系站点优选|npm i -g page-agent|npm i -g page-agent"
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

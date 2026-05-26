@@ -1,18 +1,63 @@
 [
   {
-    "id": "p1-happy-in",
+    "id": "p1-happy-in-ops",
     "prompt": "帮我把打印服务超时阈值是30s，超了会fallback到本地缓存这条知识录入知识库",
-    "expected": "应触发 /knowledge-wiki in 子命令，判断为文本输入，推断 type=ops，生成 slug，写入 .knowledge/ops/ 下对应 .md 文件，包含完整 frontmatter（title/tags/status:draft/sources/expires），输出录入确认信息"
+    "expected": "应触发 /knowledge-wiki in 子命令，判断为文本输入，按 ingestion-rules 第 9 行『超时/阈值』命中 type=ops，加载 templates/ops.md 模板，正文含 TL;DR/运行参数/告警与阈值三个必填段；运行参数含具体数值『30s』通过 8.5 门禁；写入 .knowledge/ops/{slug}.md，输出录入确认信息（含 status: draft）"
   },
   {
     "id": "p2-happy-ask",
     "prompt": "知识库里查一下打印服务的超时配置是多少",
-    "expected": "应触发 /knowledge-wiki ask 子命令，先用 rg 搜索关键词，读取命中文件 frontmatter+TL;DR，输出带来源溯源的标准回答格式（回答+来源路径+录入人+时效状态），无记录时明确报告不猜测"
+    "expected": "应触发 /knowledge-wiki ask 子命令，先用 rg 搜索关键词，读取命中文件 frontmatter+TL;DR，输出带来源溯源的标准回答格式（回答+来源路径+录入人+时效状态+links/refs 5 元素）"
   },
   {
-    "id": "p3-ambiguous-url",
+    "id": "p3-ambiguous-url-feishu",
     "prompt": "把这个文档录入知识库：https://xxx.feishu.cn/docx/12345",
-    "expected": "应触发 /knowledge-wiki in 的 URL 处理分支，识别 feishu.cn 域名使用 agent-browser 提取正文，登录检测，推断 type，结构化写入，输出确认信息。若登录检测到需登录页面则中止并提示"
+    "expected": "应触发 /knowledge-wiki in 的 URL 处理分支，识别 feishu.cn 域名走浏览器自动化工具（agent-browser / browser-harness / playwright 任选其一）；浏览器工具未装时强制提示安装；登录失败/页面 404 中止并提示。完成后按推断 type 走 14 步结构化流程"
+  },
+  {
+    "id": "p4-case-incident",
+    "prompt": "录入这条事故复盘：上周配送队列堆积导致单量延迟，根因是消费者重启时 offset 重置，已增加幂等校验由 @hanqiang 负责",
+    "expected": "应触发 /knowledge-wiki in 文本路径，按 ingestion-rules 第 10 行『故障/复盘/根因』命中 type=case；加载 templates/case.md 模板，5 必填段齐备；改进措施含责任人 @hanqiang 与代码层约束『幂等校验』；写入 .knowledge/case/{slug}.md（slug 建议格式 YYYY-MM-{主题}）"
+  },
+  {
+    "id": "p5-db-ddl",
+    "prompt": "录入配送单表 delivery_order 的 DDL：含 id/order_id/status/ctime/utime 五个字段，order_id 唯一索引",
+    "expected": "应触发 /knowledge-wiki in 文本路径，按 ingestion-rules 第 8 行『表/模型/存储/索引/DDL』命中 type=db；加载 templates/db.md 模板，3 必填段齐备；字段定义表含类型/可空/业务含义；可选段索引策略列出 idx_order_id 唯一索引；写入 .knowledge/db/{slug}.md"
+  },
+  {
+    "id": "p6-ask-fallback",
+    "prompt": "知识库里查一下「下单超时怎么处理」",
+    "expected": "应触发 /knowledge-wiki ask 子命令；Layer 0 三轮 rg 全部 0 命中（关键词偏，假设知识库无『下单』相关条目）→ 进入 Layer 0.5 frontmatter 模糊兜底，用『下单』『超时』『处理』三个片段在 title/tags 子串匹配；仍 0 命中则按 ask-rules.md『知识库无记录』模板输出，绝不脑补；如有相近 frontmatter 命中（如 print-timeout 的 tags 含 timeout）则提示『可能相关』并由用户确认"
+  },
+  {
+    "id": "p7-unknown-subcmd",
+    "prompt": "/knowledge-wiki foo bar baz",
+    "expected": "应触发『未知/缺参兜底』分支：识别首段 `foo` 不在 init/in/ask/health 之中，输出单行错误『未知子命令: foo，可用：init / in / ask / health』+ 速查表；不执行任何 IO（不读 .knowledge/、不调 rg）；不进入 in/ask 主流程"
+  },
+  {
+    "id": "p8-glossary-dedupe",
+    "prompt": "录入术语：配送单（delivery_order）——指一次配送任务的完整记录，前端叫 deliveryOrder，后端字段 delivery_order_id",
+    "expected": "应触发 /knowledge-wiki in 文本路径，按 ingestion-rules type 推断表第 1 行命中 type=glossary；执行 Step 2.6 glossary 去重前置：rg 检索 .knowledge/glossary/ 中 title 含『配送单』或别名 delivery_order/deliveryOrder 的文件；若已存在同名/高重叠（≥80%）条目，强制询问 [1] --update / [2] 强制新建（必须在 ## 边界 引用已有 slug）/ [3] 中止；若 0 命中则进入 Step 3-9 正常生成。最终 8.5 门禁：同义词与别名表至少 1 列技术列已填（前端 deliveryOrder + 后端 delivery_order_id 已达 silver）。写入 .knowledge/glossary/delivery-order.md，expires=never"
+  },
+  {
+    "id": "p9-glossary-audit-never",
+    "prompt": "/knowledge-wiki health audit delivery-order",
+    "expected": "应触发 health audit 流程：读取 .knowledge/glossary/delivery-order.md 显示 title/TL;DR/expires=never；询问 [1] 确认有效 [2] 需要更新 [3] 已废弃；选 [1] 后命中『expires 续期分支』表第 1 行（type=glossary 且 expires=never）→ 进入子询问 [1a] 维持 never / [1b] 改为 +365 天；status → active；sources 追加『人工确认 @who YYYY-MM-DD』；不应再硬编码 +90 天"
+  },
+  {
+    "id": "p10-glossary-bronze-fail",
+    "prompt": "录入术语：幂等性——指一个操作执行多次结果一致，业务上叫『不重复扣款』",
+    "expected": "应触发 /knowledge-wiki in 文本路径，type=glossary；Step 2.6 检索后无重叠则进入 Step 3-8；正文同义词与别名表仅填了『业务方=不重复扣款』一列（无前端/后端/数据库技术列）；Step 8.5 质量门禁按新 quality_gate 拦截：未达 bronze 标准（技术列 0/3）→ 输出『缺失：前端命名 / 后端字段或类名 / 数据库列名 三选一』，要求用户补充后再写入；不应直接落盘"
+  },
+  {
+    "id": "p11-distill-preview",
+    "prompt": "/knowledge-wiki health distill",
+    "expected": "应触发 health distill 预览模式（无 --execute）；按 health-rules.md distill 流程：Step 1 扫描所有 type 目录（每目录前 50 篇）做 Jaccard 相似度计算（extract_words 中文 bigram + 英文词汇），阈值 > 0.80 为重复对；Step 2 统计低质量（正文 < 50 字 且 status≠deprecated）；Step 3 统计孤立知识（related=[] 且无被引用 且 created > 14 天）；输出预览报告含三类候选数量+具体文件清单；末行提示 'health distill --execute' 执行；不修改任何文件（默认只读）"
+  },
+  {
+    "id": "p12-similar-detect-ops",
+    "prompt": "录入知识：打印服务超时时间是 30 秒，超时后走本地缓存兜底",
+    "expected": "应触发 /knowledge-wiki in 文本路径，type=ops；进入 Step 2.65 全类型相似检测前置：用 title + 输入前 100 字组合查询文本，对 .knowledge/ops/ 目录已有文档做 Jaccard 相似度；若已存在 p1 录入的 print-timeout.md（title 含『打印服务超时』），相似度应 > 0.70 触发提示；输出相似检测模板（列出相似文档 + 相似度分值），三选一 [1] 改走 --update / [2] 继续创建 / [3] 中止；用户选 [2] 后正常继续 Step 2.7→3→...→9 不做二次拦截"
   }
 ]
 

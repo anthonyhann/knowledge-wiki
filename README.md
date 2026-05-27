@@ -44,6 +44,7 @@ Specifically, AI agents cannot answer three questions:
 - [Design Principles](#design-principles)
 - [Quick Start](#quick-start)
 - [Resource Index](#resource-index)
+- [Acknowledgments](#acknowledgments)
 
 ---
 
@@ -398,6 +399,42 @@ cd ~/your-project
 | `references/scripts/commit-msg.sh` | git commit-msg hook |
 
 Full changelog: [`CHANGELOG.md`](./CHANGELOG.md)
+
+---
+
+## Acknowledgments
+
+This project draws significant inspiration from [Andrej Karpathy](https://github.com/karpathy)'s **LLM Wiki** pattern ([gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)) — a visionary proposal for building personal knowledge bases using LLMs.
+
+### Core Ideas Inherited from Karpathy's LLM Wiki
+
+Karpathy's insight is elegant: instead of re-deriving knowledge from raw documents on every query (like RAG), the LLM **incrementally builds and maintains a persistent wiki** — a structured, interlinked collection of markdown files that compounds over time. Key principles we've adopted and extended:
+
+| Karpathy's Idea | knowledge-wiki Implementation |
+|---|---|
+| **Persistent compounding artifact** — wiki gets richer with every source and every question | Our L1/L2/L3 three-layer architecture + bidirectional backlinks ensure knowledge compounds structurally |
+| **Ingest → Read → Extract → Integrate** — new sources touch 10-15 wiki pages | Our 15-step ingestion pipeline with template loading, quality gates, index updates, and backlink enqueue |
+| **Query answers filed back into wiki** — explorations compound in the knowledge base | Our `ask --from-answer` backflow mechanism persists valuable discoveries as `synthesis` documents |
+| **Lint for health** — detect contradictions, stale claims, orphan pages, missing cross-references | Our `health lint` L1–L9 consistency checks + `health distill` cognitive distillation |
+| **Index + Log** — content catalog for navigation, chronological record for context | Our `.index/` segmented indexes (9 idx files by type) + `.logs/personal/` operation logs |
+| **Schema as configuration** — document that tells the LLM how the wiki is structured | Our `references/` directory with rules, templates, and `_registry.yaml` as the single source of truth |
+| **Human curates, LLM maintains** — humans direct, LLMs do the bookkeeping | Our AI-first design: AI writes all wiki content; humans provide sources, review, and audit |
+
+### Where We Go Beyond
+
+While deeply respecting Karpathy's elegant vision, knowledge-wiki extends it with enterprise-grade rigor:
+
+- **Cognitive fidelity over semantic similarity** — Three-layer (L1/L2/L3) knowledge architecture that distinguishes decision intent from execution facts
+- **Document lifecycle management** — `draft → active → deprecated → canonical` with strict retrieval priority
+- **Three-layer data defense** — AI real-time write + health rebuild eventual consistency + pre-commit hook interception
+- **Strict traceability** — `sources` required for every entry; no source, no write, no answer
+- **Pre-ingest deduplication** — Jaccard similarity detection (>0.70) prevents knowledge duplication before write
+- **Git hooks integration** — 4 hooks (pre-commit, post-merge, pre-push, commit-msg) as quality guardrails
+
+> *"The tedious part of maintaining a knowledge base is not the reading or the thinking — it's the bookkeeping."*
+> — Andrej Karpathy
+
+We couldn't agree more. knowledge-wiki takes this philosophy and adds the structural guarantees needed when knowledge becomes the foundation for AI decision-making.
 
 ---
 

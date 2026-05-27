@@ -44,6 +44,7 @@ AI 代理无法回答三个核心问题：
 - [设计原则](#设计原则)
 - [快速开始](#快速开始)
 - [资源索引](#资源索引)
+- [致敬与灵感](#致敬与灵感)
 
 ---
 
@@ -398,6 +399,42 @@ cd ~/your-project
 | `references/scripts/commit-msg.sh` | git commit-msg hook |
 
 完整版本变更记录见 [`CHANGELOG.md`](./CHANGELOG.md)
+
+---
+
+## 致敬与灵感
+
+本项目深受 [Andrej Karpathy](https://github.com/karpathy) 大佬的 **LLM Wiki** 模式（[gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)）启发 —— 一个用 LLM 构建个人知识库的远见卓识的提案。
+
+### 从 Karpathy 的 LLM Wiki 中借鉴的核心思想
+
+Karpathy 的洞察优雅而深刻：与其在每次查询时从原始文档重新推导知识（如 RAG），不如让 LLM **增量式地构建和维护一个持久化的 wiki** —— 一个结构化、相互链接的 markdown 文件集合，随着时间推移持续复利增长。我们继承并扩展的关键原则：
+
+| Karpathy 的理念 | knowledge-wiki 的实现 |
+|---|---|
+| **持久性复利产物** —— wiki 随每个来源和每次提问变得更丰富 | L1/L2/L3 三层架构 + 双向反引用确保知识结构性复利增长 |
+| **录入→阅读→提取→整合** —— 新来源可能触及 10-15 个页面 | 15 步录入流水线：模板加载、质量门禁、索引更新、反向引用入队 |
+| **查询答案回流为 wiki 页面** —— 探索也能在知识库中复利 | `ask --from-answer` 回流机制将有价值的发现持久化为 `synthesis` 文档 |
+| **Lint 健康检查** —— 检测矛盾、过时声明、孤立页面、缺失交叉引用 | `health lint` L1–L9 一致性检查 + `health distill` 认知蒸馏 |
+| **索引 + 日志** —— 内容目录用于导航，时间线记录用于上下文恢复 | `.index/` 分段索引（9 个 idx 文件按 type 分类）+ `.logs/personal/` 操作日志 |
+| **Schema 即配置** —— 告诉 LLM wiki 如何组织的文档 | `references/` 目录包含规则、模板、`_registry.yaml` 作为唯一权威源 |
+| **人类策展，LLM 维护** —— 人类指挥，LLM 做记账苦力活 | AI-first 设计：AI 负责撰写所有 wiki 内容；人类提供来源、审阅和审计 |
+
+### 我们在哪些方面进一步延伸
+
+在深深敬重 Karpathy 优雅愿景的同时，knowledge-wiki 加入了企业级的严谨性：
+
+- **认知保真度优于语义相似度** —— 三层（L1/L2/L3）知识架构区分决策意图与执行事实
+- **文档生命周期管理** —— `draft → active → deprecated → canonical` 配合严格检索优先级
+- **三层数据防护** —— AI 实时写入 + health rebuild 最终一致 + pre-commit hook 拦截
+- **严格溯源** —— 每条录入必须有 `sources`；无来源不写、不答
+- **录入前防重** —— Jaccard 相似度检测（>0.70）在写入前阻止知识重复
+- **Git hooks 集成** —— 4 个 hook（pre-commit、post-merge、pre-push、commit-msg）作为质量护栏
+
+> *"维护知识库最累人的部分不是阅读或思考 —— 而是记账。"*
+> — Andrej Karpathy
+
+我们对此深以为然。knowledge-wiki 继承了这一哲学，并加入了当知识成为 AI 决策基础时所必需的结构性保证。
 
 ---
 

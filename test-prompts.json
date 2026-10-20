@@ -1,0 +1,49 @@
+{
+  "skill": "knowledge-wiki",
+  "version": "v2.1.0",
+  "eval_mode": "dry_run",
+  "prompts": [
+    {
+      "id": "p1-ask-doc-mode",
+      "type": "happy",
+      "prompt": "请先完整读取 ~/skills/knowledge-wiki/SKILL.md，然后执行：/knowledge-wiki ask \"打印盒子回调超时怎么配置\"",
+      "expected": "前置检查 .knowledge/ 存在 → 懒加载仅读 ask-rules.md（+ index-rules.md 做 Layer -1 预筛）→ 四层检索（Index 预筛 → rg 最多 3 轮 → 模糊兜底 → 语义筛选读全文）→ 5 元素产出（结论/来源/录入人+时效/引用链）→ 无记录时按 C1 拒答并建议 in 录入，禁止脑补 → 追加操作日志（C6，内容 hash 脱敏）"
+    },
+    {
+      "id": "p2-in-url-internal-docs",
+      "type": "happy",
+      "prompt": "请先完整读取 ~/skills/knowledge-wiki/SKILL.md，然后执行：/knowledge-wiki in https://docs.internal.example.com/page/12345",
+      "expected": "输入路由命中 URL → 内部文档平台域名触发 C5 禁浏览器、强制 internal-docs skill → 正文 >200KB 护栏 → 14 步结构化（2.5 模板加载 / 8.5 质量门禁不达标中止 / 9.5 索引更新 / 9.6 backlink 入队 / 10 日志）→ status=draft（C3）+ 提示 health audit 升级"
+    },
+    {
+      "id": "p3-ask-path-graph-guard",
+      "type": "edge",
+      "prompt": "请先完整读取 ~/skills/knowledge-wiki/SKILL.md，然后执行：/knowledge-wiki ask path \"订单\" \"配送商\"",
+      "expected": "前置 .knowledge/.graph/graph.json 存在检查（缺失则中止提示先 health graph-build，不降级到文档检索）→ graph_query.py path 最短路 → C8 护栏：只走权威边（EXTRACTED 或 reviewed=true），deprecated/EXPIRED 节点排除，AMBIGUOUS 边永不入路径 → 不可达时输出「权威路径不可达」+ --include-inferred 建议（⚠️ 推断边未经人审标注）"
+    },
+    {
+      "id": "p4-in-test-type-routing",
+      "type": "happy",
+      "prompt": "请先完整读取 ~/skills/knowledge-wiki/SKILL.md，然后执行：/knowledge-wiki in \"配送模块回归测试要点：发单前需验证配送商价格查询接口，注意 delivery_config 表 is_express 列影响快速发单物流查询，测试数据需构造 merchant_id 对应的 KV 配置\"",
+      "expected": "type 推断优先级 5.5 命中（回归测试/测试要点）→ type=test → 加载 templates/test.md 骨架（含 test_kind/test_level/scope frontmatter 字段）→ 8.5 门禁按 kind 分支校验（experience→坑点+触发+规避）→ 写入 .knowledge/tests/{slug}.md → 9.5 追加 test.idx.md → 消歧：被测表结构知识不重复建模，需引用已有 db 文档"
+    },
+    {
+      "id": "p5-ask-test-aggregation",
+      "type": "happy",
+      "prompt": "请先完整读取 ~/skills/knowledge-wiki/SKILL.md，然后执行：/knowledge-wiki ask test \"订单\"",
+      "expected": "分发路由命中 ask test 分支（不走 graph_query）→ 读 test.idx.md 全表 → scope/tags/title/TL;DR 匹配订单模块（global 恒命中）→ 按 test_kind 五分组输出（① 运行环境与命令置顶 ② 规则与规范 ③ 检查清单 ④ 坑点与经验 ⑤ 测试数据）→ 每条带 [来源: tests/{slug}] → 0 命中时如实告知+建议 in 录入（C1 禁止脑补）→ 不触发回流提示 → 记录日志 detail.layer=test"
+    },
+    {
+      "id": "p6-ask-test-level-filter",
+      "type": "edge",
+      "prompt": "请先完整读取 ~/skills/knowledge-wiki/SKILL.md，然后执行：/knowledge-wiki ask test \"订单\" --level integration",
+      "expected": "同 p5 聚合流程，但增加 test_level 过滤：仅保留 test_level==integration 或 all 的条目（unit/e2e 专属条目被过滤，输出中不出现）→ 输出标题带「（integration 层）」→ 若过滤后 0 命中，如实告知该层无测试知识记录"
+    },
+    {
+      "id": "p7-graph-build-tests-node",
+      "type": "edge",
+      "prompt": "请先完整读取 ~/skills/knowledge-wiki/SKILL.md，然后执行：/knowledge-wiki health graph-build --full，再执行 /knowledge-wiki ask explain 任意一个 tests/ 目录下的 slug",
+      "expected": "graph-build 扫描 10 个业务目录（含 tests/）→ tests/ 文档作为节点入图（DIR_TYPE_MAP tests→test 兜底）→ ask explain 输出该节点基本信息（type=test）与入/出边列表，每边带 source_location → 若无 related 关联则入边为空，如实展示不脑补"
+    }
+  ]
+}

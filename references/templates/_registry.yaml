@@ -1,0 +1,247 @@
+# 模板注册表 — 由 /knowledge-wiki in 在 AI 结构化 Step 2.5 自动加载
+#
+# 用法：
+#   1. 录入流程 Step 2 推断出 type 后，AI 读取本文件，定位到该 type 的模板文件
+#   2. 按模板骨架整理正文，required_sections 必填，optional_sections 可省
+#   3. 写入前（Step 8.5）按 quality_gate 校验，缺失必填段时返回用户补充
+#
+# 维护原则：
+#   - 模板字段变更必须同步更新 references/ingestion-rules.md 与 SKILL.md
+#   - 新增 type 必须先在本文件登记，再创建 {type}.md，否则 AI 无法路由
+#   - 任何模板的 required_sections 调整都要在 CHANGELOG.md 记录
+
+version: 1
+default_expires_days: 90        # 兜底过期时间（天）；模板可覆盖
+
+templates:
+
+  glossary:
+    file: glossary.md
+    target_dir: glossary/
+    layer: L1
+    expires_days: never         # 术语长期有效，不过期
+    required_sections:
+      - TL;DR
+      - 定义
+      - 同义词与别名
+    optional_sections:
+      - 使用场景
+      - 边界（不是什么）
+    # 同义词与别名表的 5 列：业务方/产品 | 前端 | 后端代码 | 数据库 | 三方/外部
+    # 分级标准（最低门槛 → 黄金标准）：
+    #   - bronze（强制门槛，8.5 必通过）：5 列中至少 1 列已填（且必须是技术列：前端/后端/数据库 三选一）
+    #   - silver（推荐）：3 列已填，覆盖业务方 + 前端 + 后端
+    #   - gold（最佳实践）：5 列全填，前后端语义完全对齐
+    quality_gate: "至少包含一个技术字段名映射（前端命名 / 后端字段或类名 / 数据库列名 三选一即达标 bronze）；建议升级到 silver（业务方+前端+后端 三列）或 gold（5 列全填）"
+    quality_tiers:
+      bronze: "技术列至少 1 列已填（前端 / 后端 / 数据库 三选一）"
+      silver: "≥ 3 列已填，覆盖业务方 + 前端 + 后端"
+      gold:   "5 列全填，跨上下文语义完全对齐"
+
+  architecture:
+    file: architecture.md
+    target_dir: design/
+    layer: L1
+    expires_days: 180           # 架构活文档，半年复审
+    required_sections:
+      - TL;DR
+      - 架构概览
+      - 服务拓扑
+      - 模块职责
+    optional_sections:
+      - 关键依赖
+      - 部署形态
+      - 演进路线
+    quality_gate: "服务拓扑必须列出上下游服务名；模块职责至少 2 个"
+
+  solution:
+    file: solution.md
+    target_dir: design/
+    layer: L2
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 背景与目标
+      - 方案设计
+      - 影响面
+    optional_sections:
+      - 备选方案对比
+      - 风险与回滚
+      - 上线计划
+    quality_gate: "影响面必须列出涉及服务/接口/数据表"
+
+  adr:
+    file: adr.md
+    target_dir: design/
+    layer: L1
+    expires_days: never         # 决策记录是历史快照，不过期
+    required_sections:
+      - TL;DR
+      - 背景
+      - 决策
+      - 备选方案
+      - 取舍理由
+    optional_sections:
+      - 后果
+      - 复审条件
+    quality_gate: "决策与取舍理由必须明确，备选方案至少 2 个"
+
+  requirement:
+    file: requirement.md
+    target_dir: requirements/
+    layer: L1
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 需求背景
+      - 用户故事
+      - 验收标准
+    optional_sections:
+      - 范围边界
+      - 非功能要求
+      - 排期与里程碑
+    quality_gate: "验收标准必须可测试（含明确通过条件）"
+
+  flow:
+    file: flow.md
+    target_dir: flows/
+    layer: L2
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 触发条件
+      - 主流程步骤
+      - 异常分支
+    optional_sections:
+      - 前置条件
+      - 人工介入节点
+      - 时序图
+    quality_gate: "主流程步骤必须编号；异常分支至少列出 1 条"
+
+  api:
+    file: api.md
+    target_dir: apis/
+    layer: L3
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 接口概述
+      - 请求参数
+      - 响应结构
+      - 错误码
+    optional_sections:
+      - 调用示例
+      - 限流与超时
+      - 字段映射
+    quality_gate: "请求参数与响应结构必须完整列出字段类型；错误码至少 1 个"
+
+  db:
+    file: db.md
+    target_dir: db/
+    layer: L3
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 数据模型
+      - 字段定义
+    optional_sections:
+      - 索引策略
+      - 容量与分片
+      - Redis Key 命名
+      - 关联模型
+    quality_gate: "字段定义必须包含类型、是否可空、业务含义"
+
+  ops:
+    file: ops.md
+    target_dir: ops/
+    layer: L3
+    expires_days: 90
+    required_sections:
+      - TL;DR
+      - 运行参数
+      - 告警与阈值
+    optional_sections:
+      - 大促保障
+      - 故障预案
+      - 限流配置
+      - 部署位置
+    quality_gate: "运行参数必须有具体数值（超时/重试/并发）"
+
+  case:
+    file: case.md
+    target_dir: case/
+    layer: L2
+    expires_days: 365           # 反向示例 / 问题汇总保留 1 年
+    required_sections:
+      - TL;DR
+      - 问题概述
+      - 影响与场景
+      - 根因或反例分析
+      - 改进或规避措施
+    optional_sections:
+      - 时间线
+      - 反例代码
+      - 问题清单
+      - Use Case 价值
+      - 关联案例
+    quality_gate: "至少包含 1 个反例代码片段或问题清单条目；改进/规避措施必须可执行（含责任人或代码层约束）"
+
+  synthesis:                       # [v0.8.0 新增] Ask 回流综合分析文档
+    file: synthesis.md
+    target_dir: synthesis/          # 独立目录，不和业务文档混
+    layer: L2                      # 编排层（综合多个知识点的派生知识）
+    expires_days: 60                # 较短过期：派生知识依赖原始文档，原始过期后应重新评估
+    required_sections:
+      - TL;DR
+      - 综合问题
+      - 来源文档
+      - 综合结论
+    optional_sections:
+      - 对比分析
+      - 关联发现
+      - 局限与假设
+    quality_gate: "来源文档必须 ≥2 篇且均非 deprecated；综合结论必须有明确论点，不能是原文拼接"
+    # synthesis 特殊约束：
+    #   1. 禁止二次回流：synthesis 文档不能再通过 ask 回流生成新 synthesis
+    #   2. derived_from 字段必填：记录所有被综合的原始文档 slug
+    #   3. derived_question 记录触发此综合分析的原始问题
+
+  test:                           # [v2.1.0 新增] 测试场景知识/经验/规则（供 QA Agent 消费）
+    file: test.md
+    target_dir: tests/            # 第 10 个业务目录
+    layer: L2                     # 执行层（"怎么做/怎么验证"属编排知识）
+    expires_days: 180             # 测试知识随代码演进，比 case(365) 短、比 flow(90) 长
+    required_sections:
+      - TL;DR
+      - 测试对象与场景
+      - 测试要点与规则
+      - 验证方式
+    optional_sections:
+      - 已知坑点与经验
+      - 测试数据准备
+      - 运行环境与命令
+      - 边界与异常场景
+      - 关联流程与接口
+      - Use Case 价值
+    quality_gate: "test_kind 必填（YAML 列表，值域 env|rules|checklist|experience|data）；按 kind 分支校验：checklist→≥3 条可执行验证点；rules→≥1 条规则+适用范围；experience→≥1 坑点+触发条件+规避方法；env→≥1 条可执行命令；data→≥1 条数据构造方法；必须标注 scope（适用模块）或 test_level"
+    # test 特殊约束：
+    #   1. test_kind 为列表：单一规范文档常混合多形态（如 Mock 策略+运行命令），允许多值
+    #   2. frontmatter 额外字段：test_level: unit|integration|e2e|api|all（可选，默认 all；
+    #      e2e=端到端链路对账类测试，api=API HTTP 接口测试，二者语义不同不可互换）；
+    #      scope: [模块 tag 列表]（可含 global）
+    #   3. 消歧边界（v2.1.0 案例校验修正）：
+    #      - 测试运行方式/Bootstrap/测试框架配置 → test（kind=env），NOT ops
+    #      - 仅纯基础设施（测试服 IP/DB 账号/中间件地址）→ ops
+    #      - 故障复盘型测试踩坑（信号"事故/复盘/根因"）→ case
+    #      - 测试策略决策（如"为什么三层分层"）→ adr
+    #      - 被测系统的表结构知识 → db（test 文档内只写坑点 + [[slug]] 引用）
+
+# ----------------------------------------------------------------------
+# AI 选择模板的伪代码：
+#   1. type = infer_type(content)            # 见 ingestion-rules.md type 推断规则
+#   2. tpl  = registry.templates[type]       # 加载本文件中对应条目
+#   3. body = render(tpl.file, content)      # 按模板骨架整理正文
+#   4. validate(body, tpl.required_sections, tpl.quality_gate)  # 质量门禁
+#   5. write(.knowledge/{tpl.target_dir}/{slug}.md)
+# ----------------------------------------------------------------------
+

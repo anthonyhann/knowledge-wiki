@@ -97,6 +97,14 @@ Numbers you can verify in this repo:
 - **3-tier edge trust model** (EXTRACTED / INFERRED / AMBIGUOUS) with a human-review gate; AMBIGUOUS edges can never become hard conclusions
 - Shipped in **9 gated phases** (v0.1.0 → v2.1.0), each with a documented acceptance matrix — see [CHANGELOG.md](CHANGELOG.md)
 
+## 📈 Battle-tested in production
+
+This is not a weekend demo. Between **2026-04 and 2026-10** it ran inside a production fleet of **49 agent skills** tracked over **342 scored optimization records** (measured by [skill-eval-optimizer](https://github.com/anthonyhann/skill-eval-optimizer)):
+
+- **67.8 → 90.3 / 100** across **34 optimization rounds** — every round scored on the same 8-dimension rubric, a change kept only when the score actually moved up
+- One round *shrank* the skill **404 → 216 lines (35 KB → 21.4 KB, −39% tokens)** while *raising* the score — smaller context, better behavior
+- Fleet-wide: of 44 skills with full baselines, **40 improved, average +9.9 points** — this repo is what survived that loop
+
 ## 📂 Repository layout
 
 ```

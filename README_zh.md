@@ -97,6 +97,14 @@ npx skills add anthonyhann/knowledge-wiki
 - **3 级边可信度模型**（EXTRACTED / INFERRED / AMBIGUOUS）+ 人审闸门；AMBIGUOUS 边机制级永远不能成为硬结论
 - 按 **9 个带门禁的 phase** 串行交付（v0.1.0 → v2.1.0），每个 phase 有验收矩阵——见 [CHANGELOG.md](CHANGELOG.md)
 
+## 📈 生产环境实战验证
+
+这不是周末玩具。**2026-04 至 2026-10** 期间，它运行在一个 **49 个生产级 agent skills** 的队伍中，累计 **342 条评分优化记录**（由 [skill-eval-optimizer](https://github.com/anthonyhann/skill-eval-optimizer) 跟踪打分）：
+
+- **34 轮优化迭代，67.8 → 90.3（/100）**——每轮都用同一套 8 维度 rubric 打分，分数真涨才保留改动
+- 其中一轮把 skill 从 **404 行精简到 216 行（35 KB → 21.4 KB，token −39%）**，分数不降反升——上下文更小，行为反而更好
+- 全队伍口径：44 个有完整基线的 skill 中 **40 个提升，平均 +9.9 分**——本仓库就是从这套循环里活下来的
+
 ## 📂 目录结构
 
 ```
